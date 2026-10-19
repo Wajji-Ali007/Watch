@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Together - ہم قدم مووی پارٹی</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS for Real-time Sync without backend -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-950 text-white min-h-screen flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/50 backdrop-blur">
+        <h1 class="text-2xl font-black text-rose-500 tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-film"></i> WatchTogether
+        </h1>
+        <div id="connectionStatus" class="text-xs px-3 py-1 rounded-full bg-gray-800 text-gray-400">
+            Offline
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 flex flex-col items-center justify-center p-4">
+        
+        <!-- Setup Screen (Create / Join) -->
+        <div id="setupScreen" class="w-full max-w-md bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-2xl space-y-6">
+            
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-800">
+                <button id="tabCreateBtn" onclick="switchTab('create')" class="flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500">
+                    Create Room
+                </button>
+                <button id="tabJoinBtn" onclick="switchTab('join')" class="flex-1 pb-3 font-semibold text-gray-400 border-b-2 border-transparent">
+                    Join Room
+                </button>
+            </div>
+
+            <!-- Create Room Section -->
+            <div id="createSection" class="space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">YouTube یا Direct Video (.mp4) لنک ڈالیں:</label>
+                    <input type="text" id="videoLinkInput" placeholder="https://www.youtube.com/watch?v=..." 
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                </div>
+                <button onclick="handleCreateRoom()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 font-bold rounded-lg transition shadow-lg shadow-rose-600/30">
+                    <i class="fa-solid fa-plus-circle mr-1"></i> Create Room & Copy Link
+                </button>
+            </div>
+
+            <!-- Join Room Section -->
+            <div id="joinSection" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Room Code درج کریں:</label>
+                    <input type="text" id="roomCodeInput" placeholder="Room Code paste karein" 
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                </div>
+                <button onclick="handleManualJoin()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 font-bold rounded-lg transition shadow-lg shadow-blue-600/30">
+                    <i class="fa-solid fa-right-to-bracket mr-1"></i> Join Room
+                </button>
+            </div>
+
+            <!-- Copied Notice -->
+            <div id="copyAlert" class="hidden p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs text-center">
+                <i class="fa-solid fa-check-circle mr-1"></i> لنک کاپی ہو چکا ہے! اپنے دوست کو بھیجیں۔
+            </div>
+
+        </div>
+
+        <!-- Theater / Video Player Screen (Hidden initially) -->
+        <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-4">
+            
+            <!-- Controls bar -->
+            <div class="w-full flex justify-between items-center bg-gray-900 p-3 rounded-xl border border-gray-800 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="roleBadge" class="text-xs font-semibold px-2 py-0.5 rounded bg-gray-800 text-gray-300">Host</span>
+                    <span id="roomCodeDisplay" class="text-xs text-gray-400"></span>
+                </div>
+                <button onclick="copyCurrentLink()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-xs rounded border border-gray-700">
+                    <i class="fa-regular fa-copy"></i> Copy Link
+                </button>
+            </div>
+
+            <!-- Video Box -->
+            <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-gray-800 flex items-center justify-center">
+                <!-- YouTube Player -->
+                <div id="ytPlayer" class="w-full h-full"></div>
+                <!-- Native Video Tag -->
+                <video id="nativePlayer" class="w-full h-full hidden" controls playsinline></video>
+            </div>
+            
+            <p class="text-xs text-gray-500 text-center">
+                ⚠️ نوٹ: ایک شخص ویڈیو پلے یا پاز کرے گا تو دوسرے کی ویڈیو خود سنک ہو جائے گی۔
+            </p>
+        </div>
+
+    </main>
+
+    <!-- YouTube IFrame API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+
+    <script>
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+        let ytPlayer = null;
+        let ytReady = false;
+        let currentVideoType = 'youtube'; // 'youtube' or 'native'
+        let isInternalAction = false; // loops roknay k liye
+
+        // Check if YouTube API loaded
+        function onYouTubeIframeAPIReady() {
+            ytReady = true;
+        }
+
+        // Tab Switching
+        function switchTab(type) {
+            const createSec = document.getElementById('createSection');
+            const joinSec = document.getElementById('joinSection');
+            const createBtn = document.getElementById('tabCreateBtn');
+            const joinBtn = document.getElementById('tabJoinBtn');
+
+            if(type === 'create') {
+                createSec.classList.remove('hidden');
+                joinSec.classList.add('hidden');
+                createBtn.className = "flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500";
+                joinBtn.className = "flex-1 pb-3 font-semibold text-gray-400 border-b-2 border-transparent";
+            } else {
+                joinSec.classList.remove('hidden');
+                createSec.classList.add('hidden');
+                joinBtn.className = "flex-1 pb-3 font-semibold text-blue-500 border-b-2 border-blue-500";
+                createBtn.className = "flex-1 pb-3 font-semibold text-gray-400 border-b-2 border-transparent";
+            }
+        }
+
+        // Helper: Extract YouTube ID
+        function getYouTubeId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        // Initialize Peer
+        function initPeer(customId = null) {
+            return new Promise((resolve) => {
+                peer = customId ? new Peer(customId) : new Peer();
+                peer.on('open', (id) => {
+                    resolve(id);
+                });
+                peer.on('connection', (c) => {
+                    conn = c;
+                    setupDataListeners();
+                    updateStatus("Connected with Partner", true);
+                });
+            });
+        }
+
+        // Host creates room
+        async function handleCreateRoom() {
+            const link = document.getElementById('videoLinkInput').value.trim();
+            if(!link) return alert("براہ کرم ویڈیو کا لنک درج کریں!");
+
+            isHost = true;
+            const myId = await initPeer();
+            
+            // Build shareable link
+            const fullUrl = `${window.location.origin}${window.location.pathname}?room=${myId}&v=${encodeURIComponent(link)}`;
+            
+            // Auto copy
+            navigator.clipboard.writeText(fullUrl).then(() => {
+                document.getElementById('copyAlert').classList.remove('hidden');
+            });
+
+            // Start Theater
+            loadVideo(link);
+            showTheater(myId, true);
+        }
+
+        // Manual Join
+        function handleManualJoin() {
+            const code = document.getElementById('roomCodeInput').value.trim();
+            if(!code) return alert("Room Code درج کریں!");
+            joinRoom(code);
+        }
+
+        // Join Room by ID
+        async function joinRoom(targetPeerId, videoUrl = null) {
+            isHost = false;
+            await initPeer();
+            conn = peer.connect(targetPeerId);
+
+            conn.on('open', () => {
+                updateStatus("Connected to Host", true);
+                // Host se video link mangna agar URL me na ho
+                if(videoUrl) {
+                    loadVideo(decodeURIComponent(videoUrl));
+                    showTheater(targetPeerId, false);
+                }
+            });
+
+            setupDataListeners();
+        }
+
+        // Setup Data Events
+        function setupDataListeners() {
+            conn.on('data', (data) => {
+                isInternalAction = true;
+                if(data.action === 'play') {
+                    playVideo();
+                } else if(data.action === 'pause') {
+                    pauseVideo();
+                } else if(data.action === 'seek') {
+                    seekVideo(data.time);
+                }
+                setTimeout(() => { isInternalAction = false; }, 500);
+            });
+        }
+
+        function sendSignal(action, time = 0) {
+            if(conn && conn.open && !isInternalAction) {
+                conn.send({ action, time });
+            }
+        }
+
+        // Video Player Handling
+        function loadVideo(url) {
+            const ytId = getYouTubeId(url);
+            const nativeVideo = document.getElementById('nativePlayer');
+            const ytDiv = document.getElementById('ytPlayer');
+
+            if(ytId) {
+                currentVideoType = 'youtube';
+                nativeVideo.classList.add('hidden');
+                ytDiv.classList.remove('hidden');
+
+                if(ytPlayer) {
+                    ytPlayer.loadVideoById(ytId);
+                } else {
+                    ytPlayer = new YT.Player('ytPlayer', {
+                        videoId: ytId,
+                        playerVars: { 'autoplay': 0, 'controls': 1 },
+                        events: {
+                            'onStateChange': onPlayerStateChange
+                        }
+                    });
+                }
+            } else {
+                currentVideoType = 'native';
+                ytDiv.classList.add('hidden');
+                nativeVideo.classList.remove('hidden');
+                nativeVideo.src = url;
+
+                nativeVideo.onplay = () => sendSignal('play');
+                nativeVideo.onpause = () => sendSignal('pause');
+                nativeVideo.onseeked = () => sendSignal('seek', nativeVideo.currentTime);
+            }
+        }
+
+        function onPlayerStateChange(event) {
+            if (isInternalAction) return;
+            if (event.data === YT.PlayerState.PLAYING) {
+                sendSignal('play');
+            } else if (event.data === YT.PlayerState.PAUSED) {
+                sendSignal('pause');
+                sendSignal('seek', ytPlayer.getCurrentTime());
+            }
+        }
+
+        function playVideo() {
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.playVideo) {
+                ytPlayer.playVideo();
+            } else {
+                document.getElementById('nativePlayer').play();
+            }
+        }
+
+        function pauseVideo() {
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.pauseVideo) {
+                ytPlayer.pauseVideo();
+            } else {
+                document.getElementById('nativePlayer').pause();
+            }
+        }
+
+        function seekVideo(time) {
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.seekTo) {
+                ytPlayer.seekTo(time, true);
+            } else {
+                document.getElementById('nativePlayer').currentTime = time;
+            }
+        }
+
+        function showTheater(code, hostStatus) {
+            document.getElementById('setupScreen').classList.add('hidden');
+            document.getElementById('theaterScreen').classList.remove('hidden');
+            document.getElementById('roleBadge').innerText = hostStatus ? "Host" : "Guest";
+            document.getElementById('roomCodeDisplay').innerText = `Room: ${code.substring(0, 8)}...`;
+        }
+
+        function updateStatus(text, isGood) {
+            const el = document.getElementById('connectionStatus');
+            el.innerText = text;
+            el.className = isGood ? "text-xs px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "text-xs px-3 py-1 rounded-full bg-gray-800 text-gray-400";
+        }
+
+        function copyCurrentLink() {
+            navigator.clipboard.writeText(window.location.href);
+            alert("لنک کاپی ہو گیا!");
+        }
+
+        // On Page Load: Check if URL has ?room=
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const roomId = params.get('room');
+            const videoSrc = params.get('v');
+
+            if(roomId) {
+                // Auto join guest
+                document.getElementById('setupScreen').classList.add('hidden');
+                document.getElementById('theaterScreen').classList.remove('hidden');
+                updateStatus("Connecting...", false);
+                
+                // YouTube API thora time leti hai initialize hone me
+                const timer = setInterval(() => {
+                    if(ytReady || videoSrc) {
+                        clearInterval(timer);
+                        joinRoom(roomId, videoSrc);
+                    }
+                }, 300);
+            }
+        });
+    </script>
+</body>
+</html>
