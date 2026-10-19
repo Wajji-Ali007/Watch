@@ -3,215 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WatchTogether - Social Movie Rooms</title>
+    <title>WatchTogether - Real-Time Synced Player & Chat</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PeerJS for Realtime Sync -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <!-- Firebase Compat SDKs (Direct Browser Support) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
+        /* Custom scrollbar for chat */
         #chatMessages::-webkit-scrollbar { width: 4px; }
         #chatMessages::-webkit-scrollbar-track { background: transparent; }
         #chatMessages::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
 
-    <!-- Top Navigation Header -->
-    <header class="p-3 sm:p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex justify-between items-center sticky top-0 z-40">
+    <!-- Header -->
+    <header class="p-3 sm:p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex justify-between items-center sticky top-0 z-50">
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-clapperboard text-rose-500 text-xl"></i>
             <span class="text-xl font-black tracking-tight text-white">Watch<span class="text-rose-500">Together</span></span>
         </div>
-        
-        <!-- User State / Profile Bar -->
-        <div id="navUserSection" class="flex items-center gap-3">
-            <span id="loadingAuth" class="text-xs text-slate-400 flex items-center gap-1.5">
-                <i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Initializing...
-            </span>
-            <div id="userProfileBadge" class="hidden flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span id="navUsername" class="text-xs font-bold text-slate-200">User</span>
-                <button onclick="handleLogout()" class="ml-2 px-2.5 py-1 bg-slate-800 hover:bg-rose-950/60 hover:text-rose-400 text-xs rounded-lg border border-slate-700 transition">
-                    Logout
-                </button>
-            </div>
+        <div id="statusBadge" class="text-xs font-semibold px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-slate-500"></span> Disconnected
         </div>
     </header>
 
-    <!-- REAL-TIME INCOMING DIRECT INVITE POPUP -->
-    <div id="incomingInviteModal" class="hidden fixed top-20 right-4 sm:right-6 z-50 bg-slate-900 border-2 border-rose-500 shadow-2xl rounded-2xl p-4 max-w-sm animate-bounce">
-        <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full bg-rose-600/20 text-rose-500 flex items-center justify-center text-lg shrink-0">
-                <i class="fa-solid fa-video"></i>
-            </div>
-            <div class="flex-1">
-                <h4 class="text-sm font-bold text-white" id="inviterName">Friend invited you!</h4>
-                <p class="text-xs text-slate-400 mt-0.5">Wants to watch a video together right now.</p>
-                <div class="flex gap-2 mt-3">
-                    <button onclick="acceptInvite()" class="flex-1 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition">
-                        Accept & Watch
-                    </button>
-                    <button onclick="declineInvite()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition">
-                        Decline
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MAIN APP VIEWPORT -->
-    <main class="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full max-w-6xl mx-auto">
+    <!-- Main Body -->
+    <main class="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full">
         
-        <!-- 1. AUTH SCREEN (Login & Sign Up) -->
-        <div id="authScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
+        <!-- Setup Screen (Create / Join) -->
+        <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
+            
             <div class="flex border-b border-slate-800">
-                <button id="tabLoginBtn" onclick="switchAuthTab('login')" class="flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition">
-                    Login
+                <button id="tabCreateBtn" onclick="switchTab('create')" class="flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition">
+                    Create Room
                 </button>
-                <button id="tabSignupBtn" onclick="switchAuthTab('signup')" class="flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition">
-                    Sign Up
+                <button id="tabJoinBtn" onclick="switchTab('join')" class="flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition">
+                    Join Room
                 </button>
             </div>
 
-            <!-- Login Form -->
-            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+            <!-- Create Form -->
+            <div id="createSection" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Email:</label>
-                    <input type="email" id="loginEmail" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Video Link (YouTube or Direct MP4):</label>
+                    <input type="text" id="videoLinkInput" placeholder="https://www.youtube.com/watch?v=..." 
+                           class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Password:</label>
-                    <input type="password" id="loginPassword" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                </div>
-                <button type="submit" id="loginSubmitBtn" class="w-full py-3 bg-rose-600 hover:bg-rose-700 font-bold rounded-lg transition shadow-lg shadow-rose-600/30">
-                    Login to Account
+                <button id="createRoomBtn" onclick="handleCreateRoom()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 font-bold rounded-lg transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus-circle"></i> Create Room & Copy Link
                 </button>
-            </form>
+            </div>
 
-            <!-- Signup Form -->
-            <form id="signupForm" onsubmit="handleSignup(event)" class="space-y-4 hidden">
+            <!-- Join Form -->
+            <div id="joinSection" class="space-y-4 hidden">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Choose Unique Username:</label>
-                    <input type="text" id="signupUsername" placeholder="e.g. waji786" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Room Key or Link:</label>
+                    <input type="text" id="roomCodeInput" placeholder="Paste Key or Invite Link here..." 
+                           class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Email:</label>
-                    <input type="email" id="signupEmail" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Password (min 6 characters):</label>
-                    <input type="password" id="signupPassword" minlength="6" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                </div>
-                <button type="submit" id="signupSubmitBtn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 font-bold rounded-lg transition shadow-lg shadow-emerald-600/30">
-                    Create Account
+                <button id="joinRoomBtn" onclick="handleManualJoin()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 font-bold rounded-lg transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Join Room
                 </button>
-            </form>
+            </div>
 
-            <div id="authAlert" class="hidden p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center font-medium"></div>
+            <div id="alertMsg" class="hidden p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs text-center font-medium"></div>
         </div>
 
-        <!-- 2. SOCIAL DASHBOARD SCREEN (Start Room + Friends Online List) -->
-        <div id="dashboardScreen" class="w-full hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Theater Room Screen -->
+        <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-4">
             
-            <!-- Left 2 Cols: Start Party Box -->
-            <div class="md:col-span-2 space-y-6">
-                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
-                    <h3 class="text-base font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-film text-rose-500"></i> Start a Watch Party
-                    </h3>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Paste YouTube URL or Direct MP4:</label>
-                        <input type="text" id="dashboardVideoUrl" placeholder="https://www.youtube.com/watch?v=..." 
-                               class="w-full p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-rose-500">
-                    </div>
-                    <button onclick="handleDashboardCreateRoom()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-sm transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-play"></i> Launch Room & Invite Friends
-                    </button>
-                </div>
-
-                <!-- Manual Join Box -->
-                <div class="bg-slate-900/60 border border-slate-800/80 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div class="flex-1 w-full">
-                        <div class="text-xs font-bold text-slate-300">Have a direct Room Key or Link?</div>
-                        <input type="text" id="manualJoinKey" placeholder="Paste Key or Invite Link here..." 
-                               class="w-full mt-1.5 p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-white focus:outline-none focus:border-rose-500">
-                    </div>
-                    <button onclick="handleDashboardManualJoin()" class="w-full sm:w-auto sm:mt-5 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-700 transition">
-                        Join Key
-                    </button>
-                </div>
-            </div>
-
-            <!-- Right 1 Col: Friends & Realtime Direct Invites -->
-            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col h-[460px]">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-user-group text-rose-500"></i> Friends List
-                    </h3>
-                    <span id="onlineCount" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-400 font-bold">0 Online</span>
-                </div>
-
-                <!-- Add Friend By Username -->
-                <div class="mt-3 flex gap-2">
-                    <input type="text" id="searchFriendUsername" placeholder="Search friend's username..." 
-                           class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
-                    <button onclick="handleAddFriend()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition">
-                        Add
-                    </button>
-                </div>
-                <div id="addFriendAlert" class="hidden text-[10px] mt-1 text-center font-semibold"></div>
-
-                <!-- Real-time Friends Container -->
-                <div id="friendsListContainer" class="flex-1 overflow-y-auto mt-4 space-y-2 pr-1">
-                    <div class="text-center text-xs text-slate-500 mt-10">
-                        No friends added yet.<br>Add friends by username above!
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- 3. THEATER ROOM SCREEN (Video + Synced Controls + Live Chat) -->
-        <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-3">
-            
-            <!-- Room Controls Bar -->
-            <div class="w-full bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+            <!-- Room Info Bar -->
+            <div class="w-full bg-slate-900 p-3 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-lg">
                 <div class="flex items-center gap-3">
                     <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">Host</span>
                     <div>
                         <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Room Key</div>
-                        <div id="displayKey" class="text-xs font-mono font-bold text-slate-200">Generating...</div>
+                        <div id="displayKey" class="text-xs sm:text-sm font-mono font-bold text-slate-200">Connecting...</div>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <!-- Direct Invite Friend Button inside Room -->
-                    <div class="relative">
-                        <button onclick="toggleFriendInviteMenu()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm">
-                            <i class="fa-solid fa-user-plus"></i> Invite Friend
-                        </button>
-                        <div id="friendInviteMenu" class="hidden absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1">
-                            <div class="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase">Select friend to send invite:</div>
-                            <div id="inRoomFriendsList" class="max-h-48 overflow-y-auto space-y-1"></div>
-                        </div>
-                    </div>
-
+                    <button onclick="copyRoomKey()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 transition">
+                        <i class="fa-regular fa-copy"></i> Key
+                    </button>
                     <button onclick="copyFullLink()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 shadow-sm">
                         <i class="fa-solid fa-share-nodes"></i> Share Link
-                    </button>
-                    <button onclick="leaveRoomToDashboard()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 transition">
-                        Dashboard
                     </button>
                 </div>
             </div>
 
-            <!-- Video Player Box -->
+            <!-- Video Player -->
             <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
                 <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
                 <video id="nativePlayer" class="w-full h-full hidden" controls playsinline></video>
@@ -228,26 +112,32 @@
                 </div>
             </div>
 
-            <!-- SYNCED QUICK CONTROLS -->
+            <!-- SYNCED QUICK CONTROLS BAR -->
             <div class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2 shadow-md">
                 <div class="flex items-center gap-2">
+                    <!-- -10s -->
                     <button onclick="userSeekDelta(-10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95">
                         <i class="fa-solid fa-rotate-left"></i> -10s
                     </button>
+
+                    <!-- Play / Pause -->
                     <button id="togglePlayBtn" onclick="userTogglePlay()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-xs font-bold text-white flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-rose-600/20">
                         <i id="playIcon" class="fa-solid fa-pause"></i> <span id="playText">Pause</span>
                     </button>
+
+                    <!-- +10s -->
                     <button onclick="userSeekDelta(10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95">
                         +10s <i class="fa-solid fa-rotate-right"></i>
                     </button>
                 </div>
 
+                <!-- Speed Selector -->
                 <div class="flex items-center gap-1.5">
                     <span class="text-[11px] font-bold text-slate-400 hidden sm:inline">Speed:</span>
                     <select id="speedSelect" onchange="userChangeSpeed(this.value)" class="bg-slate-800 text-slate-200 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-700 focus:outline-none focus:border-rose-500">
                         <option value="0.5">0.5x</option>
                         <option value="0.75">0.75x</option>
-                        <option value="1" selected>1.0x</option>
+                        <option value="1" selected>1.0x (Normal)</option>
                         <option value="1.25">1.25x</option>
                         <option value="1.5">1.5x</option>
                         <option value="2">2.0x</option>
@@ -255,8 +145,9 @@
                 </div>
             </div>
 
-            <!-- LIVE CHAT SECTION -->
+            <!-- LIVE COMMENTS / CHAT SECTION -->
             <div class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-72">
+                <!-- Chat Header -->
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-comments text-rose-500 text-sm"></i>
@@ -264,11 +155,19 @@
                     </div>
                     <span class="text-[10px] text-slate-500 font-medium">Real-Time</span>
                 </div>
-                <div id="chatMessages" class="flex-1 overflow-y-auto space-y-2.5 pr-1"></div>
+
+                <!-- Chat Message List -->
+                <div id="chatMessages" class="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                    <div class="text-center text-[11px] text-slate-500 my-2">
+                        🎬 Room is live! Discuss movie scenes and drop your comments below.
+                    </div>
+                </div>
+
+                <!-- Chat Input Form -->
                 <form onsubmit="handleSendChat(event)" class="mt-3 flex gap-2">
                     <input type="text" id="chatInput" placeholder="React to this scene..." autocomplete="off"
                            class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition">
-                    <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-md shadow-rose-600/30">
+                    <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 active:scale-95 shadow-md shadow-rose-600/30">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </form>
@@ -282,333 +181,6 @@
     <script src="https://www.youtube.com/iframe_api"></script>
 
     <script>
-        /*************************************************************
-         * 1. FIREBASE INITIALIZATION WITH YOUR EXACT KEYS
-         *************************************************************/
-        const firebaseConfig = {
-            apiKey: "AIzaSyBnrkQAjPeetJWPcYhW4NK4d1SSM15bbEA",
-            authDomain: "mahveenwajahat.firebaseapp.com",
-            projectId: "mahveenwajahat",
-            storageBucket: "mahveenwajahat.firebasestorage.app",
-            messagingSenderId: "1068557622123",
-            appId: "1:1068557622123:web:dfe4300b304c0ab328ca2e",
-            measurementId: "G-Q1M5Z7CDQX"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        let currentUserData = null;
-        let friendsUnsubscribe = null;
-        let invitesUnsubscribe = null;
-        let activePendingInvite = null;
-
-        /*************************************************************
-         * 2. AUTHENTICATION & PROFILES
-         *************************************************************/
-        auth.onAuthStateChanged(async (user) => {
-            document.getElementById('loadingAuth').classList.add('hidden');
-            if (user) {
-                const doc = await db.collection('users').doc(user.uid).get();
-                if(doc.exists) {
-                    currentUserData = doc.data();
-                } else {
-                    currentUserData = { uid: user.uid, email: user.email, username: user.email.split('@')[0], friends: [] };
-                    await db.collection('users').doc(user.uid).set(currentUserData, { merge: true });
-                }
-
-                // Update online status
-                db.collection('users').doc(user.uid).update({ isOnline: true, lastSeen: Date.now() });
-
-                document.getElementById('userProfileBadge').classList.remove('hidden');
-                document.getElementById('navUsername').innerText = currentUserData.username;
-                showDashboard();
-                listenToFriends();
-                listenToIncomingInvites();
-            } else {
-                currentUserData = null;
-                document.getElementById('userProfileBadge').classList.add('hidden');
-                showAuthScreen();
-                if(friendsUnsubscribe) friendsUnsubscribe();
-                if(invitesUnsubscribe) invitesUnsubscribe();
-            }
-        });
-
-        // Set offline when closing window
-        window.addEventListener('beforeunload', () => {
-            if(currentUserData && currentUserData.uid) {
-                db.collection('users').doc(currentUserData.uid).update({ isOnline: false });
-            }
-        });
-
-        function switchAuthTab(type) {
-            const loginForm = document.getElementById('loginForm');
-            const signupForm = document.getElementById('signupForm');
-            const loginBtn = document.getElementById('tabLoginBtn');
-            const signupBtn = document.getElementById('tabSignupBtn');
-
-            if(type === 'login') {
-                loginForm.classList.remove('hidden');
-                signupForm.classList.add('hidden');
-                loginBtn.className = "flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition";
-                signupBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
-            } else {
-                signupForm.classList.remove('hidden');
-                loginForm.classList.add('hidden');
-                signupBtn.className = "flex-1 pb-3 font-semibold text-emerald-500 border-b-2 border-emerald-500 transition";
-                loginBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
-            }
-        }
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value.trim();
-            const pass = document.getElementById('loginPassword').value.trim();
-            try {
-                await auth.signInWithEmailAndPassword(email, pass);
-            } catch(err) {
-                showAuthAlert(err.message);
-            }
-        }
-
-        async function handleSignup(e) {
-            e.preventDefault();
-            const username = document.getElementById('signupUsername').value.trim().toLowerCase();
-            const email = document.getElementById('signupEmail').value.trim();
-            const pass = document.getElementById('signupPassword').value.trim();
-
-            if(!/^[a-z0-9_]{3,16}$/.test(username)) {
-                return showAuthAlert("Username must be 3-16 chars (letters, numbers, underscores).");
-            }
-
-            try {
-                const check = await db.collection('users').where('username', '==', username).get();
-                if(!check.empty) {
-                    return showAuthAlert("Username is already taken! Choose another.");
-                }
-
-                const res = await auth.createUserWithEmailAndPassword(email, pass);
-                await db.collection('users').doc(res.user.uid).set({
-                    uid: res.user.uid,
-                    username: username,
-                    email: email,
-                    friends: [],
-                    isOnline: true,
-                    lastSeen: Date.now()
-                });
-            } catch(err) {
-                showAuthAlert(err.message);
-            }
-        }
-
-        async function handleLogout() {
-            if(currentUserData) {
-                await db.collection('users').doc(currentUserData.uid).update({ isOnline: false });
-            }
-            auth.signOut();
-        }
-
-        function showAuthAlert(msg) {
-            const el = document.getElementById('authAlert');
-            el.innerText = msg;
-            el.classList.remove('hidden');
-            setTimeout(() => el.classList.add('hidden'), 4500);
-        }
-
-        function showAuthScreen() {
-            document.getElementById('authScreen').classList.remove('hidden');
-            document.getElementById('dashboardScreen').classList.add('hidden');
-            document.getElementById('theaterScreen').classList.add('hidden');
-        }
-
-        function showDashboard() {
-            document.getElementById('authScreen').classList.add('hidden');
-            document.getElementById('dashboardScreen').classList.remove('hidden');
-            document.getElementById('theaterScreen').classList.add('hidden');
-        }
-
-        /*************************************************************
-         * 3. FRIENDS & DIRECT IN-APP INVITES
-         *************************************************************/
-        async function handleAddFriend() {
-            const searchInput = document.getElementById('searchFriendUsername');
-            const targetUsername = searchInput.value.trim().toLowerCase();
-            const alertBox = document.getElementById('addFriendAlert');
-
-            if(!targetUsername) return;
-            if(targetUsername === currentUserData.username) {
-                alertBox.innerText = "You cannot add yourself!";
-                alertBox.className = "text-[10px] mt-1 text-center font-semibold text-amber-400";
-                alertBox.classList.remove('hidden');
-                return;
-            }
-
-            try {
-                const query = await db.collection('users').where('username', '==', targetUsername).get();
-                if(query.empty) {
-                    alertBox.innerText = "User not found!";
-                    alertBox.className = "text-[10px] mt-1 text-center font-semibold text-rose-400";
-                } else {
-                    const targetUser = query.docs[0].data();
-                    await db.collection('users').doc(currentUserData.uid).update({
-                        friends: firebase.firestore.FieldValue.arrayUnion(targetUser.uid)
-                    });
-                    await db.collection('users').doc(targetUser.uid).update({
-                        friends: firebase.firestore.FieldValue.arrayUnion(currentUserData.uid)
-                    });
-
-                    alertBox.innerText = `Added ${targetUser.username} to your friends!`;
-                    alertBox.className = "text-[10px] mt-1 text-center font-semibold text-emerald-400";
-                    searchInput.value = '';
-                }
-                alertBox.classList.remove('hidden');
-                setTimeout(() => alertBox.classList.add('hidden'), 3500);
-            } catch(err) {
-                console.error(err);
-            }
-        }
-
-        function listenToFriends() {
-            friendsUnsubscribe = db.collection('users').doc(currentUserData.uid).onSnapshot(async (doc) => {
-                const uData = doc.data();
-                if(!uData || !uData.friends || uData.friends.length === 0) {
-                    renderFriendsList([]);
-                    return;
-                }
-
-                const friendsSnap = await db.collection('users').where('uid', 'in', uData.friends.slice(0, 10)).get();
-                const list = [];
-                friendsSnap.forEach(d => list.push(d.data()));
-                renderFriendsList(list);
-            });
-        }
-
-        function renderFriendsList(friends) {
-            const container = document.getElementById('friendsListContainer');
-            const inRoomList = document.getElementById('inRoomFriendsList');
-            const countBadge = document.getElementById('onlineCount');
-
-            if(friends.length === 0) {
-                container.innerHTML = '<div class="text-center text-xs text-slate-500 mt-10">No friends added yet.<br>Add friends by username above!</div>';
-                inRoomList.innerHTML = '<div class="text-[10px] text-slate-500 p-2 text-center">No friends available</div>';
-                countBadge.innerText = '0 Online';
-                return;
-            }
-
-            let onlineCount = 0;
-            container.innerHTML = '';
-            inRoomList.innerHTML = '';
-
-            friends.forEach(f => {
-                if(f.isOnline) onlineCount++;
-
-                const item = document.createElement('div');
-                item.className = "p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between";
-                item.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full ${f.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}"></span>
-                        <div>
-                            <div class="text-xs font-bold text-white">${f.username}</div>
-                            <div class="text-[10px] text-slate-400">${f.isOnline ? 'Online' : 'Offline'}</div>
-                        </div>
-                    </div>
-                    <button onclick="inviteFriendDirectly('${f.uid}', '${f.username}')" 
-                            class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-[11px] font-bold rounded-lg transition ${!f.isOnline ? 'opacity-50' : ''}">
-                        <i class="fa-solid fa-paper-plane mr-1"></i> Invite
-                    </button>
-                `;
-                container.appendChild(item);
-
-                const dropItem = document.createElement('button');
-                dropItem.className = "w-full text-left p-1.5 hover:bg-slate-800 rounded-lg flex items-center justify-between text-xs transition";
-                dropItem.innerHTML = `
-                    <span class="font-bold ${f.isOnline ? 'text-white' : 'text-slate-400'}">${f.username}</span>
-                    <span class="text-[10px] ${f.isOnline ? 'text-emerald-400' : 'text-slate-600'}">${f.isOnline ? 'Send Invite' : 'Offline'}</span>
-                `;
-                dropItem.onclick = () => {
-                    sendDirectInvite(f.uid, f.username);
-                    toggleFriendInviteMenu();
-                };
-                inRoomList.appendChild(dropItem);
-            });
-
-            countBadge.innerText = `${onlineCount} Online`;
-        }
-
-        async function sendDirectInvite(friendUid, friendName) {
-            if(!currentRoomId || !currentVideoSource) {
-                alert("Please launch a room first!");
-                return;
-            }
-
-            await db.collection('invites').add({
-                toUid: friendUid,
-                fromUid: currentUserData.uid,
-                fromUsername: currentUserData.username,
-                roomId: currentRoomId,
-                videoUrl: currentVideoSource,
-                status: 'pending',
-                timestamp: Date.now()
-            });
-
-            alert(`Direct invite sent to ${friendName}!`);
-        }
-
-        function inviteFriendDirectly(friendUid, friendName) {
-            const dashVideo = document.getElementById('dashboardVideoUrl').value.trim();
-            if(!dashVideo) {
-                alert("Please paste a video link first in the 'Start a Watch Party' box!");
-                return;
-            }
-            handleDashboardCreateRoom().then(() => {
-                sendDirectInvite(friendUid, friendName);
-            });
-        }
-
-        function listenToIncomingInvites() {
-            invitesUnsubscribe = db.collection('invites')
-                .where('toUid', '==', currentUserData.uid)
-                .where('status', '==', 'pending')
-                .onSnapshot((snap) => {
-                    if(!snap.empty) {
-                        const invDoc = snap.docs[0];
-                        activePendingInvite = { id: invDoc.id, ...invDoc.data() };
-                        document.getElementById('inviterName').innerText = `${activePendingInvite.fromUsername} invites you!`;
-                        document.getElementById('incomingInviteModal').classList.remove('hidden');
-                    } else {
-                        document.getElementById('incomingInviteModal').classList.add('hidden');
-                    }
-                });
-        }
-
-        async function acceptInvite() {
-            if(!activePendingInvite) return;
-            const invite = activePendingInvite;
-            await db.collection('invites').doc(invite.id).update({ status: 'accepted' });
-            document.getElementById('incomingInviteModal').classList.add('hidden');
-            joinAsGuest(invite.roomId, invite.videoUrl);
-        }
-
-        async function declineInvite() {
-            if(!activePendingInvite) return;
-            await db.collection('invites').doc(activePendingInvite.id).update({ status: 'declined' });
-            document.getElementById('incomingInviteModal').classList.add('hidden');
-        }
-
-        function toggleFriendInviteMenu() {
-            document.getElementById('friendInviteMenu').classList.toggle('hidden');
-        }
-
-        function leaveRoomToDashboard() {
-            if(confirm("Leave this watch room and return to Dashboard?")) {
-                showDashboard();
-            }
-        }
-
-        /*************************************************************
-         * 4. WATCH TOGETHER SYNC ENGINE & PLAYER (PeerJS)
-         *************************************************************/
         let peer = null;
         let conn = null;
         let isHost = false;
@@ -619,6 +191,61 @@
         let isInternalSync = false;
         let lastKnownTime = 0;
 
+        function switchTab(type) {
+            const createSec = document.getElementById('createSection');
+            const joinSec = document.getElementById('joinSection');
+            const createBtn = document.getElementById('tabCreateBtn');
+            const joinBtn = document.getElementById('tabJoinBtn');
+
+            if(type === 'create') {
+                createSec.classList.remove('hidden');
+                joinSec.classList.add('hidden');
+                createBtn.className = "flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition";
+                joinBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
+            } else {
+                joinSec.classList.remove('hidden');
+                createSec.classList.add('hidden');
+                joinBtn.className = "flex-1 pb-3 font-semibold text-blue-500 border-b-2 border-blue-500 transition";
+                createBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
+            }
+        }
+
+        function safeCopy(text, msg) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => showAlert(msg));
+            } else {
+                const temp = document.createElement("input");
+                temp.value = text;
+                document.body.appendChild(temp);
+                temp.select();
+                try {
+                    document.execCommand('copy');
+                    showAlert(msg);
+                } catch(e) {
+                    alert("Copy manually: " + text);
+                }
+                document.body.removeChild(temp);
+            }
+        }
+
+        function showAlert(msg) {
+            const el = document.getElementById('alertMsg');
+            el.innerText = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3500);
+        }
+
+        function updateStatus(text, status) {
+            const badge = document.getElementById('statusBadge');
+            const colors = {
+                connected: 'bg-emerald-500',
+                connecting: 'bg-amber-500',
+                disconnected: 'bg-slate-500'
+            };
+            const col = colors[status] || 'bg-slate-500';
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full ${col} ${status === 'connected' ? 'animate-pulse' : ''}"></span> ${text}`;
+        }
+
         function getYouTubeId(url) {
             if(!url) return null;
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -628,18 +255,25 @@
 
         function initPeerServer() {
             return new Promise((resolve) => {
+                updateStatus("Connecting Server...", "connecting");
                 peer = new Peer();
                 peer.on('open', (id) => {
                     currentRoomId = id;
                     document.getElementById('displayKey').innerText = id;
+                    updateStatus("Waiting for Partner", "connecting");
                     resolve(id);
+                });
+                peer.on('error', (err) => {
+                    console.error("PeerJS Error:", err);
+                    updateStatus("Server Error", "disconnected");
                 });
             });
         }
 
-        async function handleDashboardCreateRoom() {
-            const link = document.getElementById('dashboardVideoUrl').value.trim();
-            if(!link) return alert("Please enter a valid video URL!");
+        // Host Flow
+        async function handleCreateRoom() {
+            const link = document.getElementById('videoLinkInput').value.trim();
+            if(!link) return alert("Please paste a valid video URL!");
 
             isHost = true;
             currentVideoSource = link;
@@ -650,19 +284,25 @@
                 setupConnectionHandlers();
             });
 
+            const fullUrl = buildInviteLink(myId, link);
+            safeCopy(fullUrl, "Room created! Invite link copied to clipboard.");
+
             setupPlayer(link);
             showTheaterView(true);
         }
 
-        function handleDashboardManualJoin() {
-            let key = document.getElementById('manualJoinKey').value.trim();
-            if(!key) return alert("Please enter Room Key or Link!");
+        // Guest Flow
+        async function handleManualJoin() {
+            let key = document.getElementById('roomCodeInput').value.trim();
+            if(!key) return alert("Please enter the Room Key or Link!");
+
             let extractedVideo = null;
             if (key.includes('?')) {
                 const urlParams = new URLSearchParams(key.split('?')[1]);
                 extractedVideo = urlParams.get('v');
                 key = urlParams.get('room') || key;
             }
+
             joinAsGuest(key, extractedVideo);
         }
 
@@ -679,13 +319,17 @@
             }
 
             await initPeerServer();
+            updateStatus("Connecting to Host...", "connecting");
+            
             conn = peer.connect(targetKey, { reliable: true });
             setupConnectionHandlers();
         }
 
+        // Connection Handlers
         function setupConnectionHandlers() {
             conn.on('open', () => {
-                if(!isHost) {
+                updateStatus("Connected with Partner", "connected");
+                if (!isHost) {
                     conn.send({ type: 'REQUEST_FULL_STATE' });
                 } else {
                     sendCurrentStateToPeer();
@@ -694,6 +338,10 @@
 
             conn.on('data', (data) => {
                 handleIncomingSignal(data);
+            });
+
+            conn.on('close', () => {
+                updateStatus("Partner Disconnected", "disconnected");
             });
         }
 
@@ -709,13 +357,20 @@
             }
         }
 
+        // Process Incoming Command or Chat
         function handleIncomingSignal(data) {
             if (data.type === 'CHAT_MSG') {
-                appendChatMessage({ sender: data.sender, text: data.text, time: data.time, isMe: false });
+                appendChatMessage({
+                    sender: data.sender,
+                    text: data.text,
+                    time: data.time,
+                    isMe: false
+                });
                 return;
             }
 
             isInternalSync = true;
+
             if (data.type === 'REQUEST_FULL_STATE') {
                 sendCurrentStateToPeer();
             } else if (data.type === 'FULL_STATE') {
@@ -724,8 +379,11 @@
                     setupPlayer(data.videoUrl, () => {
                         seekToTime(data.time);
                         setPlaybackRate(data.speed || 1);
-                        if (data.isPlaying) document.getElementById('syncOverlay').classList.remove('hidden');
-                        else pauseVideo();
+                        if (data.isPlaying) {
+                            document.getElementById('syncOverlay').classList.remove('hidden');
+                        } else {
+                            pauseVideo();
+                        }
                     });
                 } else {
                     seekToTime(data.time);
@@ -745,6 +403,7 @@
             } else if (data.type === 'RATE') {
                 setPlaybackRate(data.rate);
             }
+
             setTimeout(() => { isInternalSync = false; }, 800);
         }
 
@@ -754,7 +413,7 @@
             }
         }
 
-        // Live Chat Handlers
+        // CHAT FUNCTIONALITY
         function handleSendChat(event) {
             event.preventDefault();
             const input = document.getElementById('chatInput');
@@ -762,13 +421,33 @@
             if(!text) return;
 
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const myName = currentUserData ? currentUserData.username : (isHost ? 'Host' : 'Guest');
+            const myRole = isHost ? 'Host' : 'Guest';
 
-            appendChatMessage({ sender: myName, text: text, time: timeStr, isMe: true });
+            // Show locally
+            appendChatMessage({
+                sender: 'You (' + myRole + ')',
+                text: text,
+                time: timeStr,
+                isMe: true
+            });
 
+            // Send to partner
             if(conn && conn.open) {
-                conn.send({ type: 'CHAT_MSG', sender: myName, text: text, time: timeStr });
+                conn.send({
+                    type: 'CHAT_MSG',
+                    sender: myRole,
+                    text: text,
+                    time: timeStr
+                });
+            } else {
+                appendChatMessage({
+                    sender: 'System',
+                    text: '⚠️ Partner not connected yet. Waiting for them to join...',
+                    time: timeStr,
+                    isMe: false
+                });
             }
+
             input.value = '';
         }
 
@@ -793,10 +472,11 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // Synced Quick Controls
+        // QUICK CONTROLS
         function userTogglePlay() {
             const playing = isPlayerPlaying();
             const time = getCurrentTime();
+
             if (playing) {
                 pauseVideo();
                 updatePlayPauseButton(false);
@@ -808,8 +488,8 @@
             }
         }
 
-        function userSeekDelta(delta) {
-            const newTime = Math.max(0, getCurrentTime() + delta);
+        function userSeekDelta(deltaSeconds) {
+            const newTime = Math.max(0, getCurrentTime() + deltaSeconds);
             seekToTime(newTime);
             sendSignal('SEEK', { time: newTime });
         }
@@ -832,7 +512,7 @@
             }
         }
 
-        // Video Player Logic
+        // PLAYER SETUP
         function setupPlayer(url, onReadyCallback) {
             const ytId = getYouTubeId(url);
             const nativeVideo = document.getElementById('nativePlayer');
@@ -850,22 +530,26 @@
                     } else {
                         ytPlayer = new YT.Player('ytPlayer', {
                             videoId: ytId,
-                            playerVars: { 'autoplay': 0, 'controls': 1, 'playsinline': 1, 'enablejsapi': 1 },
+                            playerVars: { 
+                                'autoplay': 0, 
+                                'controls': 1, 
+                                'playsinline': 1,
+                                'enablejsapi': 1 
+                            },
                             events: {
-                                'onReady': () => { if(onReadyCallback) onReadyCallback(); },
+                                'onReady': () => {
+                                    if(onReadyCallback) onReadyCallback();
+                                },
                                 'onStateChange': onYouTubeStateChange,
-                                'onPlaybackRateChange': (e) => {
-                                    if(isInternalSync) return;
-                                    document.getElementById('speedSelect').value = e.data;
-                                    sendSignal('RATE', { rate: e.data });
-                                }
+                                'onPlaybackRateChange': onYouTubeRateChange
                             }
                         });
                     }
                 };
 
-                if(window.YT && window.YT.Player) attachYT();
-                else {
+                if(window.YT && window.YT.Player) {
+                    attachYT();
+                } else {
                     const timer = setInterval(() => {
                         if(window.YT && window.YT.Player) {
                             clearInterval(timer);
@@ -879,10 +563,20 @@
                 nativeVideo.classList.remove('hidden');
                 nativeVideo.src = url;
 
-                nativeVideo.onplay = () => { updatePlayPauseButton(true); if(!isInternalSync) sendSignal('PLAY', { time: nativeVideo.currentTime }); };
-                nativeVideo.onpause = () => { updatePlayPauseButton(false); if(!isInternalSync) sendSignal('PAUSE', { time: nativeVideo.currentTime }); };
-                nativeVideo.onseeked = () => { if(!isInternalSync) sendSignal('SEEK', { time: nativeVideo.currentTime }); };
-                nativeVideo.onratechange = () => { if(!isInternalSync) sendSignal('RATE', { rate: nativeVideo.playbackRate }); };
+                nativeVideo.onplay = () => {
+                    updatePlayPauseButton(true);
+                    if(!isInternalSync) sendSignal('PLAY', { time: nativeVideo.currentTime });
+                };
+                nativeVideo.onpause = () => {
+                    updatePlayPauseButton(false);
+                    if(!isInternalSync) sendSignal('PAUSE', { time: nativeVideo.currentTime });
+                };
+                nativeVideo.onseeked = () => {
+                    if(!isInternalSync) sendSignal('SEEK', { time: nativeVideo.currentTime });
+                };
+                nativeVideo.onratechange = () => {
+                    if(!isInternalSync) sendSignal('RATE', { rate: nativeVideo.playbackRate });
+                };
 
                 if(onReadyCallback) onReadyCallback();
             }
@@ -891,6 +585,7 @@
         function onYouTubeStateChange(event) {
             if(isInternalSync) return;
             const time = ytPlayer.getCurrentTime();
+
             if(event.data === YT.PlayerState.PLAYING) {
                 updatePlayPauseButton(true);
                 sendSignal('PLAY', { time });
@@ -898,6 +593,12 @@
                 updatePlayPauseButton(false);
                 sendSignal('PAUSE', { time });
             }
+        }
+
+        function onYouTubeRateChange(event) {
+            if(isInternalSync) return;
+            document.getElementById('speedSelect').value = event.data;
+            sendSignal('RATE', { rate: event.data });
         }
 
         setInterval(() => {
@@ -911,8 +612,11 @@
 
         function playVideo() {
             try {
-                if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.playVideo) ytPlayer.playVideo();
-                else document.getElementById('nativePlayer').play();
+                if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.playVideo) {
+                    ytPlayer.playVideo();
+                } else {
+                    document.getElementById('nativePlayer').play();
+                }
                 updatePlayPauseButton(true);
             } catch(e) {
                 document.getElementById('syncOverlay').classList.remove('hidden');
@@ -920,25 +624,36 @@
         }
 
         function pauseVideo() {
-            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
-            else document.getElementById('nativePlayer').pause();
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.pauseVideo) {
+                ytPlayer.pauseVideo();
+            } else {
+                document.getElementById('nativePlayer').pause();
+            }
             updatePlayPauseButton(false);
         }
 
         function seekToTime(seconds) {
-            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(seconds, true);
-            else document.getElementById('nativePlayer').currentTime = seconds;
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.seekTo) {
+                ytPlayer.seekTo(seconds, true);
+            } else {
+                document.getElementById('nativePlayer').currentTime = seconds;
+            }
             lastKnownTime = seconds;
         }
 
         function setPlaybackRate(rate) {
             document.getElementById('speedSelect').value = rate;
-            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(rate);
-            else document.getElementById('nativePlayer').playbackRate = rate;
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.setPlaybackRate) {
+                ytPlayer.setPlaybackRate(rate);
+            } else {
+                document.getElementById('nativePlayer').playbackRate = rate;
+            }
         }
 
         function getCurrentTime() {
-            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) return ytPlayer.getCurrentTime();
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) {
+                return ytPlayer.getCurrentTime();
+            }
             return document.getElementById('nativePlayer').currentTime || 0;
         }
 
@@ -957,12 +672,13 @@
         function unlockPlayback() {
             document.getElementById('syncOverlay').classList.add('hidden');
             playVideo();
-            if(conn && conn.open) conn.send({ type: 'REQUEST_FULL_STATE' });
+            if(conn && conn.open) {
+                conn.send({ type: 'REQUEST_FULL_STATE' });
+            }
         }
 
         function showTheaterView(isHostRole) {
-            document.getElementById('authScreen').classList.add('hidden');
-            document.getElementById('dashboardScreen').classList.add('hidden');
+            document.getElementById('setupScreen').classList.add('hidden');
             document.getElementById('theaterScreen').classList.remove('hidden');
             const badge = document.getElementById('roleBadge');
             badge.innerText = isHostRole ? "Host" : "Guest";
@@ -971,20 +687,26 @@
                 : "text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30";
         }
 
+        function buildInviteLink(key, videoUrl) {
+            return `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${key}&v=${encodeURIComponent(videoUrl)}`;
+        }
+
+        function copyRoomKey() {
+            if(currentRoomId) safeCopy(currentRoomId, "Room Key copied!");
+        }
+
         function copyFullLink() {
             if(currentRoomId && currentVideoSource) {
-                const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}&v=${encodeURIComponent(currentVideoSource)}`;
-                navigator.clipboard.writeText(url).then(() => alert("Invite Link copied to clipboard!"));
+                safeCopy(buildInviteLink(currentRoomId, currentVideoSource), "Invite Link copied!");
             }
         }
 
-        // Direct URL param auto-join
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
-            const rKey = params.get('room');
-            const vParam = params.get('v');
-            if(rKey) {
-                joinAsGuest(rKey, vParam);
+            const roomKey = params.get('room');
+            const videoParam = params.get('v');
+            if(roomKey) {
+                joinAsGuest(roomKey, videoParam);
             }
         });
     </script>
