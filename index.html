@@ -3,6 +3,719 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WatchTogether - Real-Time Synced Player & Chat</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom scrollbar for chat */
+        #chatMessages::-webkit-scrollbar { width: 4px; }
+        #chatMessages::-webkit-scrollbar-track { background: transparent; }
+        #chatMessages::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+    <!-- Header -->
+    <header class="p-3 sm:p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-clapperboard text-rose-500 text-xl"></i>
+            <span class="text-xl font-black tracking-tight text-white">Watch<span class="text-rose-500">Together</span></span>
+        </div>
+        <div id="statusBadge" class="text-xs font-semibold px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-slate-500"></span> Disconnected
+        </div>
+    </header>
+
+    <!-- Main Body -->
+    <main class="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full">
+        
+        <!-- Setup Screen (Create / Join) -->
+        <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
+            
+            <div class="flex border-b border-slate-800">
+                <button id="tabCreateBtn" onclick="switchTab('create')" class="flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition">
+                    Create Room
+                </button>
+                <button id="tabJoinBtn" onclick="switchTab('join')" class="flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition">
+                    Join Room
+                </button>
+            </div>
+
+            <!-- Create Form -->
+            <div id="createSection" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Video Link (YouTube or Direct MP4):</label>
+                    <input type="text" id="videoLinkInput" placeholder="https://www.youtube.com/watch?v=..." 
+                           class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
+                </div>
+                <button id="createRoomBtn" onclick="handleCreateRoom()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 font-bold rounded-lg transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus-circle"></i> Create Room & Copy Link
+                </button>
+            </div>
+
+            <!-- Join Form -->
+            <div id="joinSection" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Room Key or Link:</label>
+                    <input type="text" id="roomCodeInput" placeholder="Paste Key or Invite Link here..." 
+                           class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
+                </div>
+                <button id="joinRoomBtn" onclick="handleManualJoin()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 font-bold rounded-lg transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Join Room
+                </button>
+            </div>
+
+            <div id="alertMsg" class="hidden p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs text-center font-medium"></div>
+        </div>
+
+        <!-- Theater Room Screen -->
+        <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-4">
+            
+            <!-- Room Info Bar -->
+            <div class="w-full bg-slate-900 p-3 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+                <div class="flex items-center gap-3">
+                    <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">Host</span>
+                    <div>
+                        <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Room Key</div>
+                        <div id="displayKey" class="text-xs sm:text-sm font-mono font-bold text-slate-200">Connecting...</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="copyRoomKey()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 transition">
+                        <i class="fa-regular fa-copy"></i> Key
+                    </button>
+                    <button onclick="copyFullLink()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-share-nodes"></i> Share Link
+                    </button>
+                </div>
+            </div>
+
+            <!-- Video Player -->
+            <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
+                <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
+                <video id="nativePlayer" class="w-full h-full hidden" controls playsinline></video>
+
+                <!-- Tap to Sync Overlay for Mobile -->
+                <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-30 hidden p-4 text-center">
+                    <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
+                        <i class="fa-solid fa-play ml-1"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-white">Tap to Start & Sync</h3>
+                    <button onclick="unlockPlayback()" class="px-6 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs transition">
+                        Tap to Watch Together
+                    </button>
+                </div>
+            </div>
+
+            <!-- SYNCED QUICK CONTROLS BAR -->
+            <div class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2 shadow-md">
+                <div class="flex items-center gap-2">
+                    <!-- -10s -->
+                    <button onclick="userSeekDelta(-10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95">
+                        <i class="fa-solid fa-rotate-left"></i> -10s
+                    </button>
+
+                    <!-- Play / Pause -->
+                    <button id="togglePlayBtn" onclick="userTogglePlay()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-xs font-bold text-white flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-rose-600/20">
+                        <i id="playIcon" class="fa-solid fa-pause"></i> <span id="playText">Pause</span>
+                    </button>
+
+                    <!-- +10s -->
+                    <button onclick="userSeekDelta(10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95">
+                        +10s <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+
+                <!-- Speed Selector -->
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[11px] font-bold text-slate-400 hidden sm:inline">Speed:</span>
+                    <select id="speedSelect" onchange="userChangeSpeed(this.value)" class="bg-slate-800 text-slate-200 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-700 focus:outline-none focus:border-rose-500">
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>1.0x (Normal)</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2.0x</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- LIVE COMMENTS / CHAT SECTION -->
+            <div class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-72">
+                <!-- Chat Header -->
+                <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-comments text-rose-500 text-sm"></i>
+                        <span class="text-xs sm:text-sm font-bold text-white">Live Discussion & Scene Reactions</span>
+                    </div>
+                    <span class="text-[10px] text-slate-500 font-medium">Real-Time</span>
+                </div>
+
+                <!-- Chat Message List -->
+                <div id="chatMessages" class="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                    <div class="text-center text-[11px] text-slate-500 my-2">
+                        🎬 Room is live! Discuss movie scenes and drop your comments below.
+                    </div>
+                </div>
+
+                <!-- Chat Input Form -->
+                <form onsubmit="handleSendChat(event)" class="mt-3 flex gap-2">
+                    <input type="text" id="chatInput" placeholder="React to this scene..." autocomplete="off"
+                           class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition">
+                    <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 active:scale-95 shadow-md shadow-rose-600/30">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- YouTube API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+
+    <script>
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+        let currentRoomId = null;
+        let currentVideoSource = null;
+        let currentVideoType = 'youtube';
+        let ytPlayer = null;
+        let isInternalSync = false;
+        let lastKnownTime = 0;
+
+        function switchTab(type) {
+            const createSec = document.getElementById('createSection');
+            const joinSec = document.getElementById('joinSection');
+            const createBtn = document.getElementById('tabCreateBtn');
+            const joinBtn = document.getElementById('tabJoinBtn');
+
+            if(type === 'create') {
+                createSec.classList.remove('hidden');
+                joinSec.classList.add('hidden');
+                createBtn.className = "flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition";
+                joinBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
+            } else {
+                joinSec.classList.remove('hidden');
+                createSec.classList.add('hidden');
+                joinBtn.className = "flex-1 pb-3 font-semibold text-blue-500 border-b-2 border-blue-500 transition";
+                createBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
+            }
+        }
+
+        function safeCopy(text, msg) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => showAlert(msg));
+            } else {
+                const temp = document.createElement("input");
+                temp.value = text;
+                document.body.appendChild(temp);
+                temp.select();
+                try {
+                    document.execCommand('copy');
+                    showAlert(msg);
+                } catch(e) {
+                    alert("Copy manually: " + text);
+                }
+                document.body.removeChild(temp);
+            }
+        }
+
+        function showAlert(msg) {
+            const el = document.getElementById('alertMsg');
+            el.innerText = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3500);
+        }
+
+        function updateStatus(text, status) {
+            const badge = document.getElementById('statusBadge');
+            const colors = {
+                connected: 'bg-emerald-500',
+                connecting: 'bg-amber-500',
+                disconnected: 'bg-slate-500'
+            };
+            const col = colors[status] || 'bg-slate-500';
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full ${col} ${status === 'connected' ? 'animate-pulse' : ''}"></span> ${text}`;
+        }
+
+        function getYouTubeId(url) {
+            if(!url) return null;
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        function initPeerServer() {
+            return new Promise((resolve) => {
+                updateStatus("Connecting Server...", "connecting");
+                peer = new Peer();
+                peer.on('open', (id) => {
+                    currentRoomId = id;
+                    document.getElementById('displayKey').innerText = id;
+                    updateStatus("Waiting for Partner", "connecting");
+                    resolve(id);
+                });
+                peer.on('error', (err) => {
+                    console.error("PeerJS Error:", err);
+                    updateStatus("Server Error", "disconnected");
+                });
+            });
+        }
+
+        // Host Flow
+        async function handleCreateRoom() {
+            const link = document.getElementById('videoLinkInput').value.trim();
+            if(!link) return alert("Please paste a valid video URL!");
+
+            isHost = true;
+            currentVideoSource = link;
+            const myId = await initPeerServer();
+
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConnectionHandlers();
+            });
+
+            const fullUrl = buildInviteLink(myId, link);
+            safeCopy(fullUrl, "Room created! Invite link copied to clipboard.");
+
+            setupPlayer(link);
+            showTheaterView(true);
+        }
+
+        // Guest Flow
+        async function handleManualJoin() {
+            let key = document.getElementById('roomCodeInput').value.trim();
+            if(!key) return alert("Please enter the Room Key or Link!");
+
+            let extractedVideo = null;
+            if (key.includes('?')) {
+                const urlParams = new URLSearchParams(key.split('?')[1]);
+                extractedVideo = urlParams.get('v');
+                key = urlParams.get('room') || key;
+            }
+
+            joinAsGuest(key, extractedVideo);
+        }
+
+        async function joinAsGuest(targetKey, initialVideoUrl = null) {
+            isHost = false;
+            currentRoomId = targetKey;
+            document.getElementById('displayKey').innerText = targetKey;
+            showTheaterView(false);
+
+            if(initialVideoUrl) {
+                currentVideoSource = decodeURIComponent(initialVideoUrl);
+                setupPlayer(currentVideoSource);
+                document.getElementById('syncOverlay').classList.remove('hidden');
+            }
+
+            await initPeerServer();
+            updateStatus("Connecting to Host...", "connecting");
+            
+            conn = peer.connect(targetKey, { reliable: true });
+            setupConnectionHandlers();
+        }
+
+        // Connection Handlers
+        function setupConnectionHandlers() {
+            conn.on('open', () => {
+                updateStatus("Connected with Partner", "connected");
+                if (!isHost) {
+                    conn.send({ type: 'REQUEST_FULL_STATE' });
+                } else {
+                    sendCurrentStateToPeer();
+                }
+            });
+
+            conn.on('data', (data) => {
+                handleIncomingSignal(data);
+            });
+
+            conn.on('close', () => {
+                updateStatus("Partner Disconnected", "disconnected");
+            });
+        }
+
+        function sendCurrentStateToPeer() {
+            if(conn && conn.open) {
+                conn.send({
+                    type: 'FULL_STATE',
+                    videoUrl: currentVideoSource,
+                    time: getCurrentTime(),
+                    isPlaying: isPlayerPlaying(),
+                    speed: getCurrentSpeed()
+                });
+            }
+        }
+
+        // Process Incoming Command or Chat
+        function handleIncomingSignal(data) {
+            if (data.type === 'CHAT_MSG') {
+                appendChatMessage({
+                    sender: data.sender,
+                    text: data.text,
+                    time: data.time,
+                    isMe: false
+                });
+                return;
+            }
+
+            isInternalSync = true;
+
+            if (data.type === 'REQUEST_FULL_STATE') {
+                sendCurrentStateToPeer();
+            } else if (data.type === 'FULL_STATE') {
+                if(!currentVideoSource || currentVideoSource !== data.videoUrl) {
+                    currentVideoSource = data.videoUrl;
+                    setupPlayer(data.videoUrl, () => {
+                        seekToTime(data.time);
+                        setPlaybackRate(data.speed || 1);
+                        if (data.isPlaying) {
+                            document.getElementById('syncOverlay').classList.remove('hidden');
+                        } else {
+                            pauseVideo();
+                        }
+                    });
+                } else {
+                    seekToTime(data.time);
+                    setPlaybackRate(data.speed || 1);
+                    if(data.isPlaying) playVideo(); else pauseVideo();
+                }
+            } else if (data.type === 'PLAY') {
+                seekToTime(data.time);
+                playVideo();
+                updatePlayPauseButton(true);
+            } else if (data.type === 'PAUSE') {
+                seekToTime(data.time);
+                pauseVideo();
+                updatePlayPauseButton(false);
+            } else if (data.type === 'SEEK') {
+                seekToTime(data.time);
+            } else if (data.type === 'RATE') {
+                setPlaybackRate(data.rate);
+            }
+
+            setTimeout(() => { isInternalSync = false; }, 800);
+        }
+
+        function sendSignal(action, payload = {}) {
+            if(conn && conn.open && !isInternalSync) {
+                conn.send({ type: action, ...payload });
+            }
+        }
+
+        // CHAT FUNCTIONALITY
+        function handleSendChat(event) {
+            event.preventDefault();
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if(!text) return;
+
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const myRole = isHost ? 'Host' : 'Guest';
+
+            // Show locally
+            appendChatMessage({
+                sender: 'You (' + myRole + ')',
+                text: text,
+                time: timeStr,
+                isMe: true
+            });
+
+            // Send to partner
+            if(conn && conn.open) {
+                conn.send({
+                    type: 'CHAT_MSG',
+                    sender: myRole,
+                    text: text,
+                    time: timeStr
+                });
+            } else {
+                appendChatMessage({
+                    sender: 'System',
+                    text: '⚠️ Partner not connected yet. Waiting for them to join...',
+                    time: timeStr,
+                    isMe: false
+                });
+            }
+
+            input.value = '';
+        }
+
+        function appendChatMessage(data) {
+            const container = document.getElementById('chatMessages');
+            const row = document.createElement('div');
+            row.className = data.isMe ? 'flex flex-col items-end' : 'flex flex-col items-start';
+
+            const bubble = document.createElement('div');
+            bubble.className = data.isMe
+                ? 'bg-rose-600 text-white rounded-2xl rounded-tr-none px-3.5 py-2 text-xs max-w-[85%] break-words shadow-md'
+                : 'bg-slate-800 text-slate-100 border border-slate-700 rounded-2xl rounded-tl-none px-3.5 py-2 text-xs max-w-[85%] break-words shadow-md';
+            bubble.innerText = data.text;
+
+            const meta = document.createElement('div');
+            meta.className = 'text-[9px] text-slate-500 mt-1 px-1';
+            meta.innerText = `${data.sender} • ${data.time}`;
+
+            row.appendChild(bubble);
+            row.appendChild(meta);
+            container.appendChild(row);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // QUICK CONTROLS
+        function userTogglePlay() {
+            const playing = isPlayerPlaying();
+            const time = getCurrentTime();
+
+            if (playing) {
+                pauseVideo();
+                updatePlayPauseButton(false);
+                sendSignal('PAUSE', { time });
+            } else {
+                playVideo();
+                updatePlayPauseButton(true);
+                sendSignal('PLAY', { time });
+            }
+        }
+
+        function userSeekDelta(deltaSeconds) {
+            const newTime = Math.max(0, getCurrentTime() + deltaSeconds);
+            seekToTime(newTime);
+            sendSignal('SEEK', { time: newTime });
+        }
+
+        function userChangeSpeed(rate) {
+            const speed = parseFloat(rate);
+            setPlaybackRate(speed);
+            sendSignal('RATE', { rate: speed });
+        }
+
+        function updatePlayPauseButton(isPlaying) {
+            const icon = document.getElementById('playIcon');
+            const text = document.getElementById('playText');
+            if (isPlaying) {
+                icon.className = "fa-solid fa-pause";
+                text.innerText = "Pause";
+            } else {
+                icon.className = "fa-solid fa-play";
+                text.innerText = "Play";
+            }
+        }
+
+        // PLAYER SETUP
+        function setupPlayer(url, onReadyCallback) {
+            const ytId = getYouTubeId(url);
+            const nativeVideo = document.getElementById('nativePlayer');
+            const ytDiv = document.getElementById('ytPlayer');
+
+            if(ytId) {
+                currentVideoType = 'youtube';
+                nativeVideo.classList.add('hidden');
+                ytDiv.classList.remove('hidden');
+
+                const attachYT = () => {
+                    if (ytPlayer && ytPlayer.loadVideoById) {
+                        ytPlayer.loadVideoById(ytId);
+                        if(onReadyCallback) onReadyCallback();
+                    } else {
+                        ytPlayer = new YT.Player('ytPlayer', {
+                            videoId: ytId,
+                            playerVars: { 
+                                'autoplay': 0, 
+                                'controls': 1, 
+                                'playsinline': 1,
+                                'enablejsapi': 1 
+                            },
+                            events: {
+                                'onReady': () => {
+                                    if(onReadyCallback) onReadyCallback();
+                                },
+                                'onStateChange': onYouTubeStateChange,
+                                'onPlaybackRateChange': onYouTubeRateChange
+                            }
+                        });
+                    }
+                };
+
+                if(window.YT && window.YT.Player) {
+                    attachYT();
+                } else {
+                    const timer = setInterval(() => {
+                        if(window.YT && window.YT.Player) {
+                            clearInterval(timer);
+                            attachYT();
+                        }
+                    }, 150);
+                }
+            } else {
+                currentVideoType = 'native';
+                ytDiv.classList.add('hidden');
+                nativeVideo.classList.remove('hidden');
+                nativeVideo.src = url;
+
+                nativeVideo.onplay = () => {
+                    updatePlayPauseButton(true);
+                    if(!isInternalSync) sendSignal('PLAY', { time: nativeVideo.currentTime });
+                };
+                nativeVideo.onpause = () => {
+                    updatePlayPauseButton(false);
+                    if(!isInternalSync) sendSignal('PAUSE', { time: nativeVideo.currentTime });
+                };
+                nativeVideo.onseeked = () => {
+                    if(!isInternalSync) sendSignal('SEEK', { time: nativeVideo.currentTime });
+                };
+                nativeVideo.onratechange = () => {
+                    if(!isInternalSync) sendSignal('RATE', { rate: nativeVideo.playbackRate });
+                };
+
+                if(onReadyCallback) onReadyCallback();
+            }
+        }
+
+        function onYouTubeStateChange(event) {
+            if(isInternalSync) return;
+            const time = ytPlayer.getCurrentTime();
+
+            if(event.data === YT.PlayerState.PLAYING) {
+                updatePlayPauseButton(true);
+                sendSignal('PLAY', { time });
+            } else if(event.data === YT.PlayerState.PAUSED) {
+                updatePlayPauseButton(false);
+                sendSignal('PAUSE', { time });
+            }
+        }
+
+        function onYouTubeRateChange(event) {
+            if(isInternalSync) return;
+            document.getElementById('speedSelect').value = event.data;
+            sendSignal('RATE', { rate: event.data });
+        }
+
+        setInterval(() => {
+            if (isInternalSync) return;
+            const currentTime = getCurrentTime();
+            if (Math.abs(currentTime - lastKnownTime) > 1.8 && isPlayerPlaying()) {
+                sendSignal('SEEK', { time: currentTime });
+            }
+            lastKnownTime = currentTime;
+        }, 500);
+
+        function playVideo() {
+            try {
+                if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.playVideo) {
+                    ytPlayer.playVideo();
+                } else {
+                    document.getElementById('nativePlayer').play();
+                }
+                updatePlayPauseButton(true);
+            } catch(e) {
+                document.getElementById('syncOverlay').classList.remove('hidden');
+            }
+        }
+
+        function pauseVideo() {
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.pauseVideo) {
+                ytPlayer.pauseVideo();
+            } else {
+                document.getElementById('nativePlayer').pause();
+            }
+            updatePlayPauseButton(false);
+        }
+
+        function seekToTime(seconds) {
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.seekTo) {
+                ytPlayer.seekTo(seconds, true);
+            } else {
+                document.getElementById('nativePlayer').currentTime = seconds;
+            }
+            lastKnownTime = seconds;
+        }
+
+        function setPlaybackRate(rate) {
+            document.getElementById('speedSelect').value = rate;
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.setPlaybackRate) {
+                ytPlayer.setPlaybackRate(rate);
+            } else {
+                document.getElementById('nativePlayer').playbackRate = rate;
+            }
+        }
+
+        function getCurrentTime() {
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) {
+                return ytPlayer.getCurrentTime();
+            }
+            return document.getElementById('nativePlayer').currentTime || 0;
+        }
+
+        function getCurrentSpeed() {
+            return parseFloat(document.getElementById('speedSelect').value) || 1;
+        }
+
+        function isPlayerPlaying() {
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.getPlayerState) {
+                return ytPlayer.getPlayerState() === YT.PlayerState.PLAYING;
+            }
+            const nat = document.getElementById('nativePlayer');
+            return !!(nat.currentTime > 0 && !nat.paused && !nat.ended && nat.readyState > 2);
+        }
+
+        function unlockPlayback() {
+            document.getElementById('syncOverlay').classList.add('hidden');
+            playVideo();
+            if(conn && conn.open) {
+                conn.send({ type: 'REQUEST_FULL_STATE' });
+            }
+        }
+
+        function showTheaterView(isHostRole) {
+            document.getElementById('setupScreen').classList.add('hidden');
+            document.getElementById('theaterScreen').classList.remove('hidden');
+            const badge = document.getElementById('roleBadge');
+            badge.innerText = isHostRole ? "Host" : "Guest";
+            badge.className = isHostRole 
+                ? "text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                : "text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30";
+        }
+
+        function buildInviteLink(key, videoUrl) {
+            return `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${key}&v=${encodeURIComponent(videoUrl)}`;
+        }
+
+        function copyRoomKey() {
+            if(currentRoomId) safeCopy(currentRoomId, "Room Key copied!");
+        }
+
+        function copyFullLink() {
+            if(currentRoomId && currentVideoSource) {
+                safeCopy(buildInviteLink(currentRoomId, currentVideoSource), "Invite Link copied!");
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const roomKey = params.get('room');
+            const videoParam = params.get('v');
+            if(roomKey) {
+                joinAsGuest(roomKey, videoParam);
+            }
+        });
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WatchTogether - Real-Time Synced Player</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
