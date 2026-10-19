@@ -3,266 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WatchTogether - Social Movie Rooms</title>
+    <title>WatchTogether - 6-Person Movie Room</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- PeerJS -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
-        #chatMessages::-webkit-scrollbar, #friendsListContainer::-webkit-scrollbar, #searchResultContainer::-webkit-scrollbar { width: 4px; }
-        #chatMessages::-webkit-scrollbar-thumb, #friendsListContainer::-webkit-scrollbar-thumb, #searchResultContainer::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        #chatMessages::-webkit-scrollbar { width: 4px; }
+        #chatMessages::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
 
-    <!-- Top Header -->
+    <!-- Top Navigation Header -->
     <header class="p-3 sm:p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex justify-between items-center sticky top-0 z-40">
         <div class="flex items-center gap-2">
-            <i class="fa-solid fa-clapperboard text-rose-500 text-xl"></i>
+            <i class="fa-solid fa-film text-rose-500 text-xl"></i>
             <span class="text-xl font-black tracking-tight text-white">Watch<span class="text-rose-500">Together</span></span>
         </div>
         
-        <div id="navUserSection" class="flex items-center gap-3">
-            <span id="loadingAuth" class="text-xs text-slate-400 flex items-center gap-1.5">
-                <i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Checking account...
-            </span>
-            <div id="userProfileBadge" class="hidden flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <div class="text-left">
-                    <div id="navFullName" class="text-xs font-bold text-slate-100 leading-tight">Name</div>
-                    <div id="navUsername" class="text-[10px] text-slate-400 font-mono">@user</div>
-                </div>
-                <button onclick="handleLogout()" class="ml-2 px-2.5 py-1 bg-slate-800 hover:bg-rose-950/60 hover:text-rose-400 text-xs rounded-lg border border-slate-700 transition">
-                    Logout
-                </button>
-            </div>
+        <div id="roomMemberBadge" class="hidden flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 text-xs font-bold text-slate-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="memberCountText">👥 1/6 in Room</span>
         </div>
     </header>
 
-    <!-- Incoming Invite Popup -->
-    <div id="incomingInviteModal" class="hidden fixed top-20 right-4 sm:right-6 z-50 bg-slate-900 border-2 border-rose-500 shadow-2xl rounded-2xl p-4 max-w-sm animate-bounce">
-        <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full bg-rose-600/20 text-rose-500 flex items-center justify-center text-lg shrink-0">
-                <i class="fa-solid fa-video"></i>
-            </div>
-            <div class="flex-1">
-                <h4 class="text-sm font-bold text-white" id="inviterName">Friend invited you!</h4>
-                <p class="text-xs text-slate-400 mt-0.5">Invited you to watch a video together.</p>
-                <div class="flex gap-2 mt-3">
-                    <button onclick="acceptInvite()" class="flex-1 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition">
-                        Accept & Watch
-                    </button>
-                    <button onclick="declineInvite()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition">
-                        Decline
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Main Container -->
-    <main class="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full max-w-6xl mx-auto">
+    <main class="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full max-w-4xl mx-auto">
         
-        <!-- 1. AUTH SCREEN (Login / Sign Up) -->
-        <div id="authScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
-            <div class="flex border-b border-slate-800">
-                <button id="tabLoginBtn" type="button" onclick="switchAuthTab('login')" class="flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition cursor-pointer">
-                    Login
-                </button>
-                <button id="tabSignupBtn" type="button" onclick="switchAuthTab('signup')" class="flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition cursor-pointer">
-                    Sign Up
-                </button>
-            </div>
-
-            <!-- Login Form -->
-            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Email:</label>
-                    <input type="email" id="loginEmail" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Password:</label>
-                    <input type="password" id="loginPassword" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                </div>
-                <button type="submit" id="loginSubmitBtn" class="w-full py-3 bg-rose-600 hover:bg-rose-700 font-bold rounded-lg transition shadow-lg shadow-rose-600/30">
-                    Login to Account
-                </button>
-            </form>
-
-            <!-- Signup Form with Name & Surname -->
-            <form id="signupForm" onsubmit="handleSignup(event)" class="space-y-3.5 hidden">
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1">First Name:</label>
-                        <input type="text" id="signupFirstName" placeholder="e.g. Wajahat" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1">Surname:</label>
-                        <input type="text" id="signupLastName" placeholder="e.g. Ali" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Username (ID for friends to find you):</label>
-                    <input type="text" id="signupUsername" placeholder="e.g. wajahat01" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Email:</label>
-                    <input type="email" id="signupEmail" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Password (min 6 characters):</label>
-                    <input type="password" id="signupPassword" minlength="6" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
-                </div>
-
-                <button type="submit" id="signupSubmitBtn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 font-bold rounded-lg transition shadow-lg shadow-emerald-600/30">
-                    Create Account
-                </button>
-            </form>
-
-            <div id="authAlert" class="hidden p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center font-medium"></div>
-        </div>
-
-        <!-- 2. DASHBOARD SCREEN -->
-        <div id="dashboardScreen" class="w-full hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- 1. SETUP / ROOM CREATOR SCREEN -->
+        <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
             
-            <!-- Left 2 Cols: Party Launchers -->
-            <div class="md:col-span-2 space-y-6">
-                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
-                    <h3 class="text-base font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-film text-rose-500"></i> Start a Watch Party
-                    </h3>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Paste YouTube URL or Direct MP4 Link:</label>
-                        <input type="text" id="dashboardVideoUrl" placeholder="https://www.youtube.com/watch?v=..." 
-                               class="w-full p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-rose-500">
-                    </div>
-                    <button onclick="handleDashboardCreateRoom()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-sm transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-play"></i> Launch Room & Invite Friends
+            <div class="text-center space-y-1">
+                <h2 class="text-lg font-black text-white">Create or Join a Room</h2>
+                <p class="text-xs text-slate-400">Watch movies together with up to 6 friends</p>
+            </div>
+
+            <!-- Nickname Input -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Your Name / Nickname:</label>
+                <input type="text" id="userNickname" placeholder="e.g. Wajahat" 
+                       class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white font-medium">
+            </div>
+
+            <!-- Source Type Switcher (URL vs Local File) -->
+            <div class="space-y-3">
+                <div class="flex border-b border-slate-800">
+                    <button id="tabUrlBtn" onclick="switchMediaTab('url')" class="flex-1 pb-2.5 font-bold text-xs text-rose-500 border-b-2 border-rose-500 transition">
+                        <i class="fa-solid fa-link mr-1"></i> Web Link
+                    </button>
+                    <button id="tabFileBtn" onclick="switchMediaTab('file')" class="flex-1 pb-2.5 font-bold text-xs text-slate-400 border-b-2 border-transparent transition">
+                        <i class="fa-solid fa-file-video mr-1"></i> Phone File (.mp4)
                     </button>
                 </div>
 
-                <div class="bg-slate-900/60 border border-slate-800/80 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div class="flex-1 w-full">
-                        <div class="text-xs font-bold text-slate-300">Have a direct Room Key or Link?</div>
-                        <input type="text" id="manualJoinKey" placeholder="Paste Key or Invite Link here..." 
-                               class="w-full mt-1.5 p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-white focus:outline-none focus:border-rose-500">
-                    </div>
-                    <button onclick="handleDashboardManualJoin()" class="w-full sm:w-auto sm:mt-5 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-700 transition">
-                        Join Key
-                    </button>
+                <!-- Web Link Input Box -->
+                <div id="urlInputContainer" class="space-y-1">
+                    <input type="text" id="videoUrlInput" placeholder="YouTube or direct MP4 URL..." 
+                           class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white">
+                </div>
+
+                <!-- File Picker Input Box -->
+                <div id="fileInputContainer" class="hidden space-y-1">
+                    <label class="block p-4 border-2 border-dashed border-slate-700 hover:border-rose-500 rounded-xl text-center cursor-pointer transition bg-slate-800/50">
+                        <i class="fa-solid fa-cloud-arrow-up text-rose-500 text-2xl mb-1"></i>
+                        <div id="selectedFileName" class="text-xs font-semibold text-slate-300">Tap to select video from storage</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">MP4, WebM, MKV supported</div>
+                        <input type="file" id="localVideoFile" accept="video/*" class="hidden" onchange="handleFileSelect(event)">
+                    </label>
                 </div>
             </div>
 
-            <!-- Right 1 Col: Friends Panel with 2 TABS -->
-            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col h-[480px]">
-                
-                <!-- Friends Navigation Tabs -->
-                <div class="flex border-b border-slate-800 pb-2 mb-3">
-                    <button id="tabMyFriendsBtn" onclick="switchFriendsTab('myFriends')" class="flex-1 text-xs font-bold text-rose-500 border-b-2 border-rose-500 pb-1.5 transition">
-                        My Friends (<span id="myFriendsCount">0</span>)
-                    </button>
-                    <button id="tabFindFriendsBtn" onclick="switchFriendsTab('findFriends')" class="flex-1 text-xs font-bold text-slate-400 border-b-2 border-transparent pb-1.5 transition">
-                        <i class="fa-solid fa-user-plus mr-1"></i> Find Friends
-                    </button>
-                </div>
+            <!-- Action Buttons -->
+            <button id="createRoomBtn" onclick="handleCreateParty()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-sm transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 active:scale-95">
+                <i class="fa-solid fa-play"></i> Create Room & Copy Invite Link
+            </button>
 
-                <!-- TAB 1: MY FOLLOWED FRIENDS LIST -->
-                <div id="myFriendsSection" class="flex-1 flex flex-col overflow-hidden">
-                    <div class="flex justify-between items-center mb-2 px-1 text-[11px] text-slate-400 font-semibold">
-                        <span>People you follow:</span>
-                        <span id="onlineCount" class="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full font-mono text-[10px]">0 Online</span>
-                    </div>
-                    <div id="friendsListContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
-                        <div class="text-center text-xs text-slate-500 mt-16">
-                            You haven't followed any friends yet.<br>Click "Find Friends" to discover people!
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB 2: FIND & FOLLOW FRIENDS (Search + Auto All Users) -->
-                <div id="findFriendsSection" class="flex-1 flex flex-col overflow-hidden hidden space-y-3">
-                    <div class="flex gap-2">
-                        <input type="text" id="searchFriendUsername" onkeyup="handleSearchKeyUp(event)" placeholder="Search username, name, or email..." 
-                               class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
-                        <button onclick="handleSearchUser()" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1">
-                            <i class="fa-solid fa-search"></i> Find
-                        </button>
-                    </div>
-
-                    <div class="text-[10px] text-slate-400 font-semibold px-1 flex justify-between items-center">
-                        <span>Available Users:</span>
-                        <button onclick="loadAllDiscoverUsers()" class="text-rose-400 hover:underline text-[10px]">Refresh</button>
-                    </div>
-
-                    <!-- Search / Discover Results List -->
-                    <div id="searchResultContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
-                        <div class="text-center text-xs text-slate-400 mt-10">
-                            <i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Loading users...
-                        </div>
-                    </div>
-                </div>
-
+            <!-- Manual Join Box -->
+            <div class="pt-4 border-t border-slate-800 flex items-center gap-2">
+                <input type="text" id="manualJoinCode" placeholder="Paste Room Key or Link..." 
+                       class="flex-1 p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-white focus:outline-none focus:border-rose-500">
+                <button onclick="handleManualJoin()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-700 transition">
+                    Join
+                </button>
             </div>
+
+            <div id="setupAlert" class="hidden p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center font-medium"></div>
 
         </div>
 
-        <!-- 3. THEATER ROOM SCREEN -->
+        <!-- 2. THEATER / WATCH PARTY SCREEN -->
         <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-3">
             
+            <!-- Room Controls & Members Bar -->
             <div class="w-full bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-lg">
                 <div class="flex items-center gap-3">
                     <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">Host</span>
                     <div>
-                        <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Room Key</div>
-                        <div id="displayKey" class="text-xs font-mono font-bold text-slate-200">Generating...</div>
+                        <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Room Code</div>
+                        <div id="displayKey" class="text-xs font-mono font-bold text-slate-200">Connecting...</div>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <div class="relative">
-                        <button onclick="toggleFriendInviteMenu()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm">
-                            <i class="fa-solid fa-user-plus"></i> Invite Friends
-                        </button>
-                        <div id="friendInviteMenu" class="hidden absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1">
-                            <div class="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase">Click friend to send invite:</div>
-                            <div id="inRoomFriendsList" class="max-h-48 overflow-y-auto space-y-1"></div>
-                        </div>
-                    </div>
-
-                    <button onclick="copyFullLink()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 shadow-sm">
-                        <i class="fa-solid fa-share-nodes"></i> Share Link
+                    <button onclick="copyFullLink()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm active:scale-95">
+                        <i class="fa-solid fa-share-nodes"></i> Share Link (Max 6)
                     </button>
-                    <button onclick="leaveRoomToDashboard()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 transition">
-                        Dashboard
+                    <button onclick="leaveRoom()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 transition">
+                        Exit
                     </button>
                 </div>
             </div>
 
+            <!-- Video Player Box -->
             <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
+                <!-- YouTube Container -->
                 <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
-                <video id="nativePlayer" class="w-full h-full hidden" controls playsinline></video>
+                <!-- Native / Stream Player -->
+                <video id="nativePlayer" class="w-full h-full hidden" playsinline></video>
 
+                <!-- Tap to Sync Overlay for Mobile -->
                 <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-30 hidden p-4 text-center">
                     <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
                         <i class="fa-solid fa-play ml-1"></i>
                     </div>
-                    <h3 class="text-base font-bold text-white">Tap to Start & Sync</h3>
+                    <h3 class="text-base font-bold text-white">Tap to Sync & Watch</h3>
                     <button onclick="unlockPlayback()" class="px-6 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs transition">
-                        Tap to Watch Together
+                        Start Video
                     </button>
                 </div>
             </div>
 
-            <!-- Controls -->
+            <!-- Synced Quick Controls -->
             <div class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2 shadow-md">
                 <div class="flex items-center gap-2">
                     <button onclick="userSeekDelta(-10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95">
@@ -289,18 +163,18 @@
                 </div>
             </div>
 
-            <!-- Chat -->
+            <!-- Group Live Chat -->
             <div class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-72">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-comments text-rose-500 text-sm"></i>
-                        <span class="text-xs sm:text-sm font-bold text-white">Live Discussion & Scene Reactions</span>
+                        <span class="text-xs sm:text-sm font-bold text-white">Live Discussion (Up to 6 friends)</span>
                     </div>
-                    <span class="text-[10px] text-slate-500 font-medium">Real-Time</span>
+                    <span class="text-[10px] text-slate-500 font-medium">Real-Time Sync</span>
                 </div>
                 <div id="chatMessages" class="flex-1 overflow-y-auto space-y-2.5 pr-1"></div>
                 <form onsubmit="handleSendChat(event)" class="mt-3 flex gap-2">
-                    <input type="text" id="chatInput" placeholder="React to this scene..." autocomplete="off"
+                    <input type="text" id="chatInput" placeholder="Comment on this scene..." autocomplete="off"
                            class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition">
                     <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-md shadow-rose-600/30">
                         <i class="fa-solid fa-paper-plane"></i>
@@ -312,678 +186,498 @@
 
     </main>
 
-    <!-- YouTube API -->
+    <!-- YouTube IFrame API -->
     <script src="https://www.youtube.com/iframe_api"></script>
 
     <script>
         /*************************************************************
-         * 1. FIREBASE CONFIGURATION
+         * MULTI-PEER ENGINE (Up to 6 Persons, Zero-Backend)
          *************************************************************/
-        const firebaseConfig = {
-            apiKey: "AIzaSyBnrkQAjPeetJWPcYhW4NK4d1SSM15bbEA",
-            authDomain: "mahveenwajahat.firebaseapp.com",
-            projectId: "mahveenwajahat",
-            storageBucket: "mahveenwajahat.firebasestorage.app",
-            messagingSenderId: "1068557622123",
-            appId: "1:1068557622123:web:dfe4300b304c0ab328ca2e",
-            measurementId: "G-Q1M5Z7CDQX"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        let currentUserData = null;
-        let friendsUnsubscribe = null;
-        let invitesUnsubscribe = null;
-        let activePendingInvite = null;
-        let myFollowedFriendsList = [];
-        let allDiscoveredUsers = [];
-
-        /*************************************************************
-         * 2. AUTHENTICATION & PROFILES
-         *************************************************************/
-        function switchAuthTab(type) {
-            const loginForm = document.getElementById('loginForm');
-            const signupForm = document.getElementById('signupForm');
-            const loginBtn = document.getElementById('tabLoginBtn');
-            const signupBtn = document.getElementById('tabSignupBtn');
-
-            if(type === 'login') {
-                loginForm.classList.remove('hidden');
-                signupForm.classList.add('hidden');
-                loginBtn.className = "flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition cursor-pointer";
-                signupBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition cursor-pointer";
-            } else {
-                signupForm.classList.remove('hidden');
-                loginForm.classList.add('hidden');
-                signupBtn.className = "flex-1 pb-3 font-semibold text-emerald-500 border-b-2 border-emerald-500 transition cursor-pointer";
-                loginBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition cursor-pointer";
-            }
-        }
-
-        auth.onAuthStateChanged(async (user) => {
-            const loadingBadge = document.getElementById('loadingAuth');
-            if(loadingBadge) loadingBadge.classList.add('hidden');
-
-            if (user) {
-                try {
-                    const doc = await db.collection('users').doc(user.uid).get();
-                    if(doc.exists) {
-                        currentUserData = doc.data();
-                    } else {
-                        currentUserData = {
-                            uid: user.uid,
-                            email: user.email,
-                            firstName: user.email.split('@')[0],
-                            lastName: '',
-                            displayName: user.email.split('@')[0],
-                            username: user.email.split('@')[0],
-                            friends: []
-                        };
-                        await db.collection('users').doc(user.uid).set(currentUserData, { merge: true });
-                    }
-
-                    db.collection('users').doc(user.uid).update({ isOnline: true, lastSeen: Date.now() });
-
-                    document.getElementById('userProfileBadge').classList.remove('hidden');
-                    document.getElementById('navFullName').innerText = currentUserData.displayName || currentUserData.firstName || currentUserData.username;
-                    document.getElementById('navUsername').innerText = '@' + currentUserData.username;
-
-                    showDashboard();
-                    listenToFriends();
-                    listenToIncomingInvites();
-                    loadAllDiscoverUsers();
-                } catch(e) {
-                    console.error("User profile load error:", e);
-                    showAuthScreen();
-                }
-            } else {
-                currentUserData = null;
-                document.getElementById('userProfileBadge').classList.add('hidden');
-                showAuthScreen();
-                if(friendsUnsubscribe) friendsUnsubscribe();
-                if(invitesUnsubscribe) invitesUnsubscribe();
-            }
-        });
-
-        window.addEventListener('beforeunload', () => {
-            if(currentUserData && currentUserData.uid) {
-                db.collection('users').doc(currentUserData.uid).update({ isOnline: false });
-            }
-        });
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value.trim();
-            const pass = document.getElementById('loginPassword').value.trim();
-            try {
-                await auth.signInWithEmailAndPassword(email, pass);
-            } catch(err) {
-                showAuthAlert(err.message);
-            }
-        }
-
-        async function handleSignup(e) {
-            e.preventDefault();
-            const firstName = document.getElementById('signupFirstName').value.trim();
-            const lastName = document.getElementById('signupLastName').value.trim();
-            const username = document.getElementById('signupUsername').value.trim().toLowerCase().replace(/^@/, '');
-            const email = document.getElementById('signupEmail').value.trim();
-            const pass = document.getElementById('signupPassword').value.trim();
-
-            if(!firstName) return showAuthAlert("Please enter your First Name.");
-            if(!username) return showAuthAlert("Please enter a username.");
-
-            try {
-                const check = await db.collection('users').where('username', '==', username).get();
-                if(!check.empty) {
-                    return showAuthAlert("Username is already taken! Please choose another.");
-                }
-
-                const res = await auth.createUserWithEmailAndPassword(email, pass);
-                const fullName = `${firstName} ${lastName}`.trim();
-                
-                await db.collection('users').doc(res.user.uid).set({
-                    uid: res.user.uid,
-                    firstName: firstName,
-                    lastName: lastName,
-                    displayName: fullName,
-                    username: username,
-                    email: email,
-                    friends: [],
-                    isOnline: true,
-                    lastSeen: Date.now()
-                });
-            } catch(err) {
-                showAuthAlert(err.message);
-            }
-        }
-
-        async function handleLogout() {
-            if(currentUserData) {
-                await db.collection('users').doc(currentUserData.uid).update({ isOnline: false });
-            }
-            auth.signOut();
-        }
-
-        function showAuthAlert(msg) {
-            const el = document.getElementById('authAlert');
-            el.innerText = msg;
-            el.classList.remove('hidden');
-            setTimeout(() => el.classList.add('hidden'), 4500);
-        }
-
-        function showAuthScreen() {
-            document.getElementById('authScreen').classList.remove('hidden');
-            document.getElementById('dashboardScreen').classList.add('hidden');
-            document.getElementById('theaterScreen').classList.add('hidden');
-        }
-
-        function showDashboard() {
-            document.getElementById('authScreen').classList.add('hidden');
-            document.getElementById('dashboardScreen').classList.remove('hidden');
-            document.getElementById('theaterScreen').classList.add('hidden');
-        }
-
-        /*************************************************************
-         * 3. FRIENDS & SEARCH / AUTO-DISCOVER SYSTEM
-         *************************************************************/
-        function switchFriendsTab(tab) {
-            const myFriendsSec = document.getElementById('myFriendsSection');
-            const findFriendsSec = document.getElementById('findFriendsSection');
-            const myFriendsBtn = document.getElementById('tabMyFriendsBtn');
-            const findFriendsBtn = document.getElementById('tabFindFriendsBtn');
-
-            if(tab === 'myFriends') {
-                myFriendsSec.classList.remove('hidden');
-                findFriendsSec.classList.add('hidden');
-                myFriendsBtn.className = "flex-1 text-xs font-bold text-rose-500 border-b-2 border-rose-500 pb-1.5 transition";
-                findFriendsBtn.className = "flex-1 text-xs font-bold text-slate-400 border-b-2 border-transparent pb-1.5 transition";
-            } else {
-                findFriendsSec.classList.remove('hidden');
-                myFriendsSec.classList.add('hidden');
-                findFriendsBtn.className = "flex-1 text-xs font-bold text-rose-500 border-b-2 border-rose-500 pb-1.5 transition";
-                myFriendsBtn.className = "flex-1 text-xs font-bold text-slate-400 border-b-2 border-transparent pb-1.5 transition";
-                loadAllDiscoverUsers();
-            }
-        }
-
-        // Auto load all registered users in the platform
-        async function loadAllDiscoverUsers() {
-            const container = document.getElementById('searchResultContainer');
-            if(!currentUserData) return;
-
-            try {
-                const snap = await db.collection('users').limit(25).get();
-                allDiscoveredUsers = [];
-                snap.forEach(d => {
-                    const u = d.data();
-                    if(u.uid !== currentUserData.uid) {
-                        allDiscoveredUsers.push(u);
-                    }
-                });
-                renderDiscoverList(allDiscoveredUsers);
-            } catch(e) {
-                console.error("Load users error:", e);
-                container.innerHTML = `<div class="text-center text-xs text-rose-400 mt-6">Failed to load users.</div>`;
-            }
-        }
-
-        function handleSearchKeyUp(e) {
-            if(e.key === 'Enter') handleSearchUser();
-            else {
-                // Live filter
-                const q = document.getElementById('searchFriendUsername').value.trim().toLowerCase().replace(/^@/, '');
-                if(!q) renderDiscoverList(allDiscoveredUsers);
-                else {
-                    const filtered = allDiscoveredUsers.filter(u => 
-                        (u.username && u.username.toLowerCase().includes(q)) ||
-                        (u.displayName && u.displayName.toLowerCase().includes(q)) ||
-                        (u.email && u.email.toLowerCase().includes(q))
-                    );
-                    renderDiscoverList(filtered);
-                }
-            }
-        }
-
-        async function handleSearchUser() {
-            const input = document.getElementById('searchFriendUsername');
-            let q = input.value.trim().toLowerCase().replace(/^@/, '');
-            const container = document.getElementById('searchResultContainer');
-
-            if(!q) {
-                renderDiscoverList(allDiscoveredUsers);
-                return;
-            }
-
-            if(q === currentUserData.username.toLowerCase()) {
-                container.innerHTML = `<div class="p-3 text-center text-xs text-amber-400 font-semibold bg-amber-500/10 rounded-xl border border-amber-500/20">That's your own username! Search for other friends.</div>`;
-                return;
-            }
-
-            container.innerHTML = `<div class="text-center text-xs text-slate-400 mt-6"><i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Searching...</div>`;
-
-            try {
-                // Search by username
-                let snap = await db.collection('users').where('username', '==', q).get();
-                
-                // If not found, try email
-                if(snap.empty) {
-                    snap = await db.collection('users').where('email', '==', q).get();
-                }
-
-                if(snap.empty) {
-                    container.innerHTML = `
-                        <div class="p-3 text-center text-xs text-rose-400 font-semibold bg-rose-500/10 rounded-xl border border-rose-500/20">
-                            No user found with "${q}".<br>
-                            <span class="text-[10px] text-slate-400">Make sure the friend has created an account first!</span>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const list = [];
-                snap.forEach(d => {
-                    if(d.data().uid !== currentUserData.uid) list.push(d.data());
-                });
-                renderDiscoverList(list);
-            } catch(e) {
-                console.error(e);
-                container.innerHTML = `<div class="text-center text-xs text-rose-400 mt-4">Error searching user.</div>`;
-            }
-        }
-
-        function renderDiscoverList(users) {
-            const container = document.getElementById('searchResultContainer');
-            if(users.length === 0) {
-                container.innerHTML = `<div class="p-4 text-center text-xs text-slate-500">No other users found yet. Invite your friends to register!</div>`;
-                return;
-            }
-
-            container.innerHTML = '';
-            users.forEach(target => {
-                const isAlreadyFriend = currentUserData.friends && currentUserData.friends.includes(target.uid);
-                const fullName = target.displayName || (target.firstName ? `${target.firstName} ${target.lastName || ''}`.trim() : target.username);
-
-                const item = document.createElement('div');
-                item.className = "p-2.5 rounded-xl bg-slate-800 border border-slate-700/80 flex items-center justify-between shadow-md";
-                item.innerHTML = `
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-full bg-rose-600/20 text-rose-400 font-bold flex items-center justify-center text-xs uppercase border border-rose-500/30">
-                            ${(target.firstName || target.username || 'U')[0]}
-                        </div>
-                        <div>
-                            <div class="text-xs font-bold text-white">${fullName}</div>
-                            <div class="text-[10px] text-slate-400 font-mono">@${target.username}</div>
-                        </div>
-                    </div>
-                    <div>
-                        ${isAlreadyFriend ? `
-                            <button onclick="handleUnfollowUser('${target.uid}')" class="px-3 py-1.5 bg-slate-700 hover:bg-rose-900/60 text-slate-200 hover:text-rose-300 text-xs font-bold rounded-lg transition">
-                                Following <i class="fa-solid fa-check ml-1 text-emerald-400"></i>
-                            </button>
-                        ` : `
-                            <button onclick="handleFollowUser('${target.uid}')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-md shadow-rose-600/30 flex items-center gap-1">
-                                <i class="fa-solid fa-user-plus"></i> Follow
-                            </button>
-                        `}
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        async function handleFollowUser(targetUid) {
-            try {
-                await db.collection('users').doc(currentUserData.uid).update({
-                    friends: firebase.firestore.FieldValue.arrayUnion(targetUid)
-                });
-                currentUserData.friends = currentUserData.friends || [];
-                currentUserData.friends.push(targetUid);
-                renderDiscoverList(allDiscoveredUsers);
-            } catch(e) {
-                console.error(e);
-            }
-        }
-
-        async function handleUnfollowUser(targetUid) {
-            if(!confirm("Unfollow this friend?")) return;
-            try {
-                await db.collection('users').doc(currentUserData.uid).update({
-                    friends: firebase.firestore.FieldValue.arrayRemove(targetUid)
-                });
-                currentUserData.friends = (currentUserData.friends || []).filter(id => id !== targetUid);
-                renderDiscoverList(allDiscoveredUsers);
-            } catch(e) {
-                console.error(e);
-            }
-        }
-
-        function listenToFriends() {
-            friendsUnsubscribe = db.collection('users').doc(currentUserData.uid).onSnapshot(async (doc) => {
-                const uData = doc.data();
-                if(!uData || !uData.friends || uData.friends.length === 0) {
-                    myFollowedFriendsList = [];
-                    renderFriendsList([]);
-                    return;
-                }
-
-                try {
-                    const snap = await db.collection('users').where('uid', 'in', uData.friends.slice(0, 10)).get();
-                    const list = [];
-                    snap.forEach(d => list.push(d.data()));
-                    myFollowedFriendsList = list;
-                    renderFriendsList(list);
-                } catch(e) {
-                    console.error("Error fetching friends:", e);
-                }
-            });
-        }
-
-        function renderFriendsList(friends) {
-            const container = document.getElementById('friendsListContainer');
-            const inRoomList = document.getElementById('inRoomFriendsList');
-            const countBadge = document.getElementById('onlineCount');
-            const totalFriendsCount = document.getElementById('myFriendsCount');
-
-            totalFriendsCount.innerText = friends.length;
-
-            if(friends.length === 0) {
-                container.innerHTML = '<div class="text-center text-xs text-slate-500 mt-16">You haven\'t followed any friends yet.<br>Click "Find Friends" to add them!</div>';
-                inRoomList.innerHTML = '<div class="text-[10px] text-slate-500 p-2 text-center">No followed friends available</div>';
-                countBadge.innerText = '0 Online';
-                return;
-            }
-
-            let onlineCount = 0;
-            container.innerHTML = '';
-            inRoomList.innerHTML = '';
-
-            friends.forEach(f => {
-                if(f.isOnline) onlineCount++;
-                const fullName = f.displayName || (f.firstName ? `${f.firstName} ${f.lastName || ''}`.trim() : f.username);
-
-                // Dashboard Friends Item
-                const item = document.createElement('div');
-                item.className = "p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between";
-                item.innerHTML = `
-                    <div class="flex items-center gap-2.5">
-                        <span class="w-2.5 h-2.5 rounded-full ${f.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}"></span>
-                        <div>
-                            <div class="text-xs font-bold text-white">${fullName}</div>
-                            <div class="text-[10px] text-slate-400 font-mono">@${f.username}</div>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-1.5">
-                        <button onclick="inviteFriendDirectly('${f.uid}', '${fullName}')" 
-                                class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-[11px] font-bold rounded-lg transition shadow-sm ${!f.isOnline ? 'opacity-60' : ''}">
-                            <i class="fa-solid fa-paper-plane mr-1"></i> Invite
-                        </button>
-                        <button onclick="handleUnfollowUser('${f.uid}')" title="Unfollow" class="px-2 py-1 bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 text-xs rounded-lg transition border border-slate-700">
-                            <i class="fa-solid fa-user-minus"></i>
-                        </button>
-                    </div>
-                `;
-                container.appendChild(item);
-
-                // In-Room Dropdown Item
-                const dropItem = document.createElement('button');
-                dropItem.className = "w-full text-left p-2 hover:bg-slate-800 rounded-lg flex items-center justify-between text-xs transition";
-                dropItem.innerHTML = `
-                    <div>
-                        <div class="font-bold ${f.isOnline ? 'text-white' : 'text-slate-400'}">${fullName}</div>
-                        <div class="text-[10px] text-slate-500 font-mono">@${f.username}</div>
-                    </div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded ${f.isOnline ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}">
-                        ${f.isOnline ? 'Send Invite' : 'Offline'}
-                    </span>
-                `;
-                dropItem.onclick = () => {
-                    sendDirectInvite(f.uid, fullName);
-                    toggleFriendInviteMenu();
-                };
-                inRoomList.appendChild(dropItem);
-            });
-
-            countBadge.innerText = `${onlineCount} Online`;
-        }
-
-        async function sendDirectInvite(friendUid, friendName) {
-            if(!currentRoomId || !currentVideoSource) {
-                alert("Please launch a room first!");
-                return;
-            }
-
-            const senderName = currentUserData.displayName || currentUserData.firstName || currentUserData.username;
-
-            await db.collection('invites').add({
-                toUid: friendUid,
-                fromUid: currentUserData.uid,
-                fromUsername: senderName,
-                roomId: currentRoomId,
-                videoUrl: currentVideoSource,
-                status: 'pending',
-                timestamp: Date.now()
-            });
-
-            alert(`Direct invite sent to ${friendName}!`);
-        }
-
-        function inviteFriendDirectly(friendUid, friendName) {
-            const dashVideo = document.getElementById('dashboardVideoUrl').value.trim();
-            if(!dashVideo) {
-                alert("Please paste a video link first in the 'Start a Watch Party' box!");
-                return;
-            }
-            handleDashboardCreateRoom().then(() => {
-                sendDirectInvite(friendUid, friendName);
-            });
-        }
-
-        function listenToIncomingInvites() {
-            invitesUnsubscribe = db.collection('invites')
-                .where('toUid', '==', currentUserData.uid)
-                .where('status', '==', 'pending')
-                .onSnapshot((snap) => {
-                    if(!snap.empty) {
-                        const invDoc = snap.docs[0];
-                        activePendingInvite = { id: invDoc.id, ...invDoc.data() };
-                        document.getElementById('inviterName').innerText = `${activePendingInvite.fromUsername} invites you!`;
-                        document.getElementById('incomingInviteModal').classList.remove('hidden');
-                    } else {
-                        document.getElementById('incomingInviteModal').classList.add('hidden');
-                    }
-                });
-        }
-
-        async function acceptInvite() {
-            if(!activePendingInvite) return;
-            const invite = activePendingInvite;
-            await db.collection('invites').doc(invite.id).update({ status: 'accepted' });
-            document.getElementById('incomingInviteModal').classList.add('hidden');
-            joinAsGuest(invite.roomId, invite.videoUrl);
-        }
-
-        async function declineInvite() {
-            if(!activePendingInvite) return;
-            await db.collection('invites').doc(activePendingInvite.id).update({ status: 'declined' });
-            document.getElementById('incomingInviteModal').classList.add('hidden');
-        }
-
-        function toggleFriendInviteMenu() {
-            document.getElementById('friendInviteMenu').classList.toggle('hidden');
-        }
-
-        function leaveRoomToDashboard() {
-            if(confirm("Leave this watch room and return to Dashboard?")) {
-                showDashboard();
-            }
-        }
-
-        /*************************************************************
-         * 4. WATCH TOGETHER SYNC ENGINE (PeerJS)
-         *************************************************************/
+        const MAX_PEERS = 5; // 1 Host + 5 Guests = 6 Persons Total
         let peer = null;
-        let conn = null;
         let isHost = false;
+        let myNickname = "Anonymous";
         let currentRoomId = null;
-        let currentVideoSource = null;
-        let currentVideoType = 'youtube';
+        
+        let guestConnections = []; // Host keeps list of connected guests
+        let hostConnection = null;  // Guest keeps connection to Host
+
+        let currentMediaType = 'youtube'; // 'youtube' | 'direct' | 'stream'
+        let currentMediaSource = null;
+        let localVideoBlobUrl = null;
+        let localMediaStream = null;
+
         let ytPlayer = null;
         let isInternalSync = false;
-        let lastKnownTime = 0;
+        let lastReportedTime = 0;
+
+        // Media Selector Tab
+        function switchMediaTab(tab) {
+            const urlContainer = document.getElementById('urlInputContainer');
+            const fileContainer = document.getElementById('fileInputContainer');
+            const urlBtn = document.getElementById('tabUrlBtn');
+            const fileBtn = document.getElementById('tabFileBtn');
+
+            if(tab === 'url') {
+                urlContainer.classList.remove('hidden');
+                fileContainer.classList.add('hidden');
+                urlBtn.className = "flex-1 pb-2.5 font-bold text-xs text-rose-500 border-b-2 border-rose-500 transition";
+                fileBtn.className = "flex-1 pb-2.5 font-bold text-xs text-slate-400 border-b-2 border-transparent transition";
+            } else {
+                fileContainer.classList.remove('hidden');
+                urlContainer.classList.add('hidden');
+                fileBtn.className = "flex-1 pb-2.5 font-bold text-xs text-rose-500 border-b-2 border-rose-500 transition";
+                urlBtn.className = "flex-1 pb-2.5 font-bold text-xs text-slate-400 border-b-2 border-transparent transition";
+            }
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if(file) {
+                document.getElementById('selectedFileName').innerText = `Selected: ${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)`;
+                localVideoBlobUrl = URL.createObjectURL(file);
+            }
+        }
 
         function getYouTubeId(url) {
             if(!url) return null;
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-            const match = url.match(regExp);
+            const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        function initPeerServer() {
-            return new Promise((resolve) => {
+        function initPeerInstance() {
+            return new Promise((resolve, reject) => {
                 peer = new Peer();
                 peer.on('open', (id) => {
                     currentRoomId = id;
                     document.getElementById('displayKey').innerText = id;
                     resolve(id);
                 });
+                peer.on('error', (err) => {
+                    console.error("PeerJS Error:", err);
+                    reject(err);
+                });
             });
         }
 
-        async function handleDashboardCreateRoom() {
-            const link = document.getElementById('dashboardVideoUrl').value.trim();
-            if(!link) return alert("Please enter a valid video URL!");
+        // Host creates party
+        async function handleCreateParty() {
+            const nameInput = document.getElementById('userNickname').value.trim();
+            myNickname = nameInput || "Host";
+
+            const isFileMode = !document.getElementById('fileInputContainer').classList.contains('hidden');
+            let targetVideo = null;
+
+            if(isFileMode) {
+                if(!localVideoBlobUrl) return alert("Please select a video file from your phone/computer!");
+                currentMediaType = 'stream';
+                targetVideo = 'stream';
+            } else {
+                const urlInput = document.getElementById('videoUrlInput').value.trim();
+                if(!urlInput) return alert("Please enter a video link!");
+                targetVideo = urlInput;
+                currentMediaType = getYouTubeId(urlInput) ? 'youtube' : 'direct';
+            }
 
             isHost = true;
-            currentVideoSource = link;
-            const myId = await initPeerServer();
+            currentMediaSource = targetVideo;
 
+            await initPeerInstance();
+            setupHostListeners();
+
+            // Load player locally
+            if(currentMediaType === 'stream') {
+                setupLocalFileStream(localVideoBlobUrl);
+            } else {
+                setupPlayer(currentMediaSource);
+            }
+
+            showTheaterScreen(true);
+            updateMemberBadge(1);
+
+            // Auto copy share link
+            copyFullLink();
+        }
+
+        // Host Peer Listeners (Star topology for up to 6 people)
+        function setupHostListeners() {
             peer.on('connection', (c) => {
-                conn = c;
-                setupConnectionHandlers();
-            });
-
-            setupPlayer(link);
-            showTheaterView(true);
-        }
-
-        function handleDashboardManualJoin() {
-            let key = document.getElementById('manualJoinKey').value.trim();
-            if(!key) return alert("Please enter Room Key or Link!");
-            let extractedVideo = null;
-            if (key.includes('?')) {
-                const urlParams = new URLSearchParams(key.split('?')[1]);
-                extractedVideo = urlParams.get('v');
-                key = urlParams.get('room') || key;
-            }
-            joinAsGuest(key, extractedVideo);
-        }
-
-        async function joinAsGuest(targetKey, initialVideoUrl = null) {
-            isHost = false;
-            currentRoomId = targetKey;
-            document.getElementById('displayKey').innerText = targetKey;
-            showTheaterView(false);
-
-            if(initialVideoUrl) {
-                currentVideoSource = decodeURIComponent(initialVideoUrl);
-                setupPlayer(currentVideoSource);
-                document.getElementById('syncOverlay').classList.remove('hidden');
-            }
-
-            await initPeerServer();
-            conn = peer.connect(targetKey, { reliable: true });
-            setupConnectionHandlers();
-        }
-
-        function setupConnectionHandlers() {
-            conn.on('open', () => {
-                if(!isHost) {
-                    conn.send({ type: 'REQUEST_FULL_STATE' });
-                } else {
-                    sendCurrentStateToPeer();
+                if(guestConnections.length >= MAX_PEERS) {
+                    c.on('open', () => {
+                        c.send({ type: 'ROOM_FULL' });
+                        c.close();
+                    });
+                    return;
                 }
-            });
 
-            conn.on('data', (data) => {
-                handleIncomingSignal(data);
-            });
-        }
+                c.on('open', () => {
+                    guestConnections.push(c);
+                    updateMemberBadge(guestConnections.length + 1);
 
-        function sendCurrentStateToPeer() {
-            if(conn && conn.open) {
-                conn.send({
-                    type: 'FULL_STATE',
-                    videoUrl: currentVideoSource,
-                    time: getCurrentTime(),
-                    isPlaying: isPlayerPlaying(),
-                    speed: getCurrentSpeed()
+                    // Send current video & state to this new guest
+                    c.send({
+                        type: 'INIT_STATE',
+                        mediaType: currentMediaType,
+                        mediaSource: currentMediaType === 'stream' ? 'stream' : currentMediaSource,
+                        time: getCurrentTime(),
+                        isPlaying: isPlayerPlaying(),
+                        speed: getCurrentSpeed(),
+                        sender: 'Host'
+                    });
+
+                    // If local stream mode, initiate WebRTC Media Call
+                    if(currentMediaType === 'stream' && localMediaStream) {
+                        peer.call(c.peer, localMediaStream);
+                    }
+
+                    broadcastSystemMessage(`${c.metadata?.name || 'A friend'} joined the room!`);
                 });
-            }
+
+                c.on('data', (data) => {
+                    handleIncomingSignal(data, c);
+                });
+
+                c.on('close', () => {
+                    guestConnections = guestConnections.filter(g => g !== c);
+                    updateMemberBadge(guestConnections.length + 1);
+                    broadcastSystemMessage(`${c.metadata?.name || 'A friend'} left the room.`);
+                });
+            });
         }
 
-        function handleIncomingSignal(data) {
-            if (data.type === 'CHAT_MSG') {
+        // Guest joins party
+        async function handleManualJoin() {
+            let key = document.getElementById('manualJoinCode').value.trim();
+            if(!key) return alert("Please enter a Room Key or Link!");
+
+            if(key.includes('?')) {
+                const params = new URLSearchParams(key.split('?')[1]);
+                key = params.get('room') || key;
+            }
+
+            joinRoomAsGuest(key);
+        }
+
+        async function joinRoomAsGuest(targetRoomId) {
+            const nameInput = document.getElementById('userNickname').value.trim();
+            myNickname = nameInput || "Guest";
+
+            isHost = false;
+            currentRoomId = targetRoomId;
+            document.getElementById('displayKey').innerText = targetRoomId;
+
+            await initPeerInstance();
+
+            // Listen for incoming media stream call if host shares local file
+            peer.on('call', (call) => {
+                call.answer(); // Guest answers without sending stream
+                call.on('stream', (remoteStream) => {
+                    currentMediaType = 'stream';
+                    const nativeVideo = document.getElementById('nativePlayer');
+                    document.getElementById('ytPlayer').classList.add('hidden');
+                    nativeVideo.classList.remove('hidden');
+                    nativeVideo.srcObject = remoteStream;
+                    nativeVideo.play().catch(() => {
+                        document.getElementById('syncOverlay').classList.remove('hidden');
+                    });
+                });
+            });
+
+            // Connect data channel to Host
+            hostConnection = peer.connect(targetRoomId, {
+                metadata: { name: myNickname },
+                reliable: true
+            });
+
+            hostConnection.on('open', () => {
+                showTheaterScreen(false);
+            });
+
+            hostConnection.on('data', (data) => {
+                handleIncomingSignal(data, hostConnection);
+            });
+
+            hostConnection.on('close', () => {
+                alert("Room closed or Host disconnected.");
+                leaveRoom();
+            });
+        }
+
+        // Handle Signals & Sync
+        function handleIncomingSignal(data, senderConn) {
+            if(data.type === 'ROOM_FULL') {
+                alert("This room is already full (Maximum 6 persons).");
+                leaveRoom();
+                return;
+            }
+
+            if(data.type === 'CHAT_MSG') {
                 appendChatMessage({ sender: data.sender, text: data.text, time: data.time, isMe: false });
+                if(isHost) {
+                    // Re-broadcast to all other guests
+                    forwardToOtherGuests(data, senderConn);
+                }
                 return;
             }
 
             isInternalSync = true;
-            if (data.type === 'REQUEST_FULL_STATE') {
-                sendCurrentStateToPeer();
-            } else if (data.type === 'FULL_STATE') {
-                if(!currentVideoSource || currentVideoSource !== data.videoUrl) {
-                    currentVideoSource = data.videoUrl;
-                    setupPlayer(data.videoUrl, () => {
+
+            if(data.type === 'INIT_STATE') {
+                currentMediaType = data.mediaType;
+                currentMediaSource = data.mediaSource;
+
+                if(currentMediaType !== 'stream') {
+                    setupPlayer(data.mediaSource, () => {
                         seekToTime(data.time);
                         setPlaybackRate(data.speed || 1);
-                        if (data.isPlaying) document.getElementById('syncOverlay').classList.remove('hidden');
-                        else pauseVideo();
+                        if(data.isPlaying) {
+                            document.getElementById('syncOverlay').classList.remove('hidden');
+                        } else {
+                            pauseVideo();
+                        }
                     });
-                } else {
-                    seekToTime(data.time);
-                    setPlaybackRate(data.speed || 1);
-                    if(data.isPlaying) playVideo(); else pauseVideo();
                 }
-            } else if (data.type === 'PLAY') {
+            } else if(data.type === 'PLAY') {
                 seekToTime(data.time);
                 playVideo();
                 updatePlayPauseButton(true);
-            } else if (data.type === 'PAUSE') {
+                if(isHost) forwardToOtherGuests(data, senderConn);
+            } else if(data.type === 'PAUSE') {
                 seekToTime(data.time);
                 pauseVideo();
                 updatePlayPauseButton(false);
-            } else if (data.type === 'SEEK') {
+                if(isHost) forwardToOtherGuests(data, senderConn);
+            } else if(data.type === 'SEEK') {
                 seekToTime(data.time);
-            } else if (data.type === 'RATE') {
+                if(isHost) forwardToOtherGuests(data, senderConn);
+            } else if(data.type === 'RATE') {
                 setPlaybackRate(data.rate);
+                if(isHost) forwardToOtherGuests(data, senderConn);
             }
-            setTimeout(() => { isInternalSync = false; }, 800);
+
+            setTimeout(() => { isInternalSync = false; }, 600);
         }
 
-        function sendSignal(action, payload = {}) {
-            if(conn && conn.open && !isInternalSync) {
-                conn.send({ type: action, ...payload });
+        function forwardToOtherGuests(payload, originConn) {
+            guestConnections.forEach(c => {
+                if(c !== originConn && c.open) {
+                    c.send(payload);
+                }
+            });
+        }
+
+        function broadcastToRoom(payload) {
+            if(isInternalSync) return;
+            if(isHost) {
+                guestConnections.forEach(c => {
+                    if(c.open) c.send(payload);
+                });
+            } else if(hostConnection && hostConnection.open) {
+                hostConnection.send(payload);
             }
         }
 
-        // Live Chat Handlers
-        function handleSendChat(event) {
-            event.preventDefault();
+        // Local Storage Video Stream Setup
+        function setupLocalFileStream(blobUrl) {
+            const nativeVideo = document.getElementById('nativePlayer');
+            document.getElementById('ytPlayer').classList.add('hidden');
+            nativeVideo.classList.remove('hidden');
+            nativeVideo.src = blobUrl;
+
+            nativeVideo.onloadedmetadata = () => {
+                try {
+                    localMediaStream = nativeVideo.captureStream ? nativeVideo.captureStream(30) : nativeVideo.mozCaptureStream(30);
+                } catch(e) {
+                    console.warn("CaptureStream error:", e);
+                }
+            };
+
+            attachNativeEventListeners(nativeVideo);
+        }
+
+        // Player Core
+        function setupPlayer(url, callback) {
+            const ytId = getYouTubeId(url);
+            const nativeVideo = document.getElementById('nativePlayer');
+            const ytDiv = document.getElementById('ytPlayer');
+
+            if(ytId) {
+                currentMediaType = 'youtube';
+                nativeVideo.classList.add('hidden');
+                ytDiv.classList.remove('hidden');
+
+                const attachYT = () => {
+                    if(ytPlayer && ytPlayer.loadVideoById) {
+                        ytPlayer.loadVideoById(ytId);
+                        if(callback) callback();
+                    } else {
+                        ytPlayer = new YT.Player('ytPlayer', {
+                            videoId: ytId,
+                            playerVars: { 'autoplay': 0, 'controls': 1, 'playsinline': 1 },
+                            events: {
+                                'onReady': () => { if(callback) callback(); },
+                                'onStateChange': onYouTubeStateChange
+                            }
+                        });
+                    }
+                };
+
+                if(window.YT && window.YT.Player) attachYT();
+                else {
+                    const timer = setInterval(() => {
+                        if(window.YT && window.YT.Player) {
+                            clearInterval(timer);
+                            attachYT();
+                        }
+                    }, 150);
+                }
+            } else {
+                currentMediaType = 'direct';
+                ytDiv.classList.add('hidden');
+                nativeVideo.classList.remove('hidden');
+                nativeVideo.src = url;
+                attachNativeEventListeners(nativeVideo);
+                if(callback) callback();
+            }
+        }
+
+        function attachNativeEventListeners(video) {
+            video.onplay = () => {
+                updatePlayPauseButton(true);
+                broadcastToRoom({ type: 'PLAY', time: video.currentTime, sender: myNickname });
+            };
+            video.onpause = () => {
+                updatePlayPauseButton(false);
+                broadcastToRoom({ type: 'PAUSE', time: video.currentTime, sender: myNickname });
+            };
+            video.onseeked = () => {
+                broadcastToRoom({ type: 'SEEK', time: video.currentTime, sender: myNickname });
+            };
+            video.onratechange = () => {
+                broadcastToRoom({ type: 'RATE', rate: video.playbackRate, sender: myNickname });
+            };
+        }
+
+        function onYouTubeStateChange(e) {
+            if(isInternalSync) return;
+            const time = ytPlayer.getCurrentTime();
+            if(e.data === YT.PlayerState.PLAYING) {
+                updatePlayPauseButton(true);
+                broadcastToRoom({ type: 'PLAY', time: time, sender: myNickname });
+            } else if(e.data === YT.PlayerState.PAUSED) {
+                updatePlayPauseButton(false);
+                broadcastToRoom({ type: 'PAUSE', time: time, sender: myNickname });
+            }
+        }
+
+        // Periodic seek check
+        setInterval(() => {
+            if(isInternalSync) return;
+            const curTime = getCurrentTime();
+            if(Math.abs(curTime - lastReportedTime) > 1.8 && isPlayerPlaying()) {
+                broadcastToRoom({ type: 'SEEK', time: curTime, sender: myNickname });
+            }
+            lastReportedTime = curTime;
+        }, 500);
+
+        // Control Actions
+        function userTogglePlay() {
+            const playing = isPlayerPlaying();
+            const time = getCurrentTime();
+            if(playing) {
+                pauseVideo();
+                broadcastToRoom({ type: 'PAUSE', time, sender: myNickname });
+            } else {
+                playVideo();
+                broadcastToRoom({ type: 'PLAY', time, sender: myNickname });
+            }
+        }
+
+        function userSeekDelta(delta) {
+            const newTime = Math.max(0, getCurrentTime() + delta);
+            seekToTime(newTime);
+            broadcastToRoom({ type: 'SEEK', time: newTime, sender: myNickname });
+        }
+
+        function userChangeSpeed(val) {
+            const rate = parseFloat(val);
+            setPlaybackRate(rate);
+            broadcastToRoom({ type: 'RATE', rate, sender: myNickname });
+        }
+
+        function updatePlayPauseButton(isPlaying) {
+            const icon = document.getElementById('playIcon');
+            const text = document.getElementById('playText');
+            if(isPlaying) {
+                icon.className = "fa-solid fa-pause";
+                text.innerText = "Pause";
+            } else {
+                icon.className = "fa-solid fa-play";
+                text.innerText = "Play";
+            }
+        }
+
+        function playVideo() {
+            try {
+                if(currentMediaType === 'youtube' && ytPlayer && ytPlayer.playVideo) ytPlayer.playVideo();
+                else document.getElementById('nativePlayer').play();
+                updatePlayPauseButton(true);
+            } catch(e) {
+                document.getElementById('syncOverlay').classList.remove('hidden');
+            }
+        }
+
+        function pauseVideo() {
+            if(currentMediaType === 'youtube' && ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+            else document.getElementById('nativePlayer').pause();
+            updatePlayPauseButton(false);
+        }
+
+        function seekToTime(seconds) {
+            if(currentMediaType === 'youtube' && ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(seconds, true);
+            else document.getElementById('nativePlayer').currentTime = seconds;
+            lastReportedTime = seconds;
+        }
+
+        function setPlaybackRate(rate) {
+            document.getElementById('speedSelect').value = rate;
+            if(currentMediaType === 'youtube' && ytPlayer && ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(rate);
+            else document.getElementById('nativePlayer').playbackRate = rate;
+        }
+
+        function getCurrentTime() {
+            if(currentMediaType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) return ytPlayer.getCurrentTime();
+            return document.getElementById('nativePlayer').currentTime || 0;
+        }
+
+        function getCurrentSpeed() {
+            return parseFloat(document.getElementById('speedSelect').value) || 1;
+        }
+
+        function isPlayerPlaying() {
+            if(currentMediaType === 'youtube' && ytPlayer && ytPlayer.getPlayerState) {
+                return ytPlayer.getPlayerState() === YT.PlayerState.PLAYING;
+            }
+            const nat = document.getElementById('nativePlayer');
+            return !!(nat.currentTime > 0 && !nat.paused && !nat.ended && nat.readyState > 2);
+        }
+
+        function unlockPlayback() {
+            document.getElementById('syncOverlay').classList.add('hidden');
+            playVideo();
+        }
+
+        // Live Chat
+        function handleSendChat(e) {
+            e.preventDefault();
             const input = document.getElementById('chatInput');
             const text = input.value.trim();
             if(!text) return;
 
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const myDisplayName = currentUserData ? (currentUserData.displayName || currentUserData.firstName || currentUserData.username) : (isHost ? 'Host' : 'Guest');
+            appendChatMessage({ sender: myNickname, text, time: timeStr, isMe: true });
 
-            appendChatMessage({ sender: myDisplayName, text: text, time: timeStr, isMe: true });
-
-            if(conn && conn.open) {
-                conn.send({ type: 'CHAT_MSG', sender: myDisplayName, text: text, time: timeStr });
-            }
+            broadcastToRoom({ type: 'CHAT_MSG', sender: myNickname, text, time: timeStr });
             input.value = '';
         }
 
@@ -1008,177 +702,21 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // Synced Controls
-        function userTogglePlay() {
-            const playing = isPlayerPlaying();
-            const time = getCurrentTime();
-            if (playing) {
-                pauseVideo();
-                updatePlayPauseButton(false);
-                sendSignal('PAUSE', { time });
-            } else {
-                playVideo();
-                updatePlayPauseButton(true);
-                sendSignal('PLAY', { time });
-            }
+        function broadcastSystemMessage(text) {
+            const container = document.getElementById('chatMessages');
+            const msg = document.createElement('div');
+            msg.className = "text-center text-[10px] text-slate-400 font-semibold my-1";
+            msg.innerText = `⚡ ${text}`;
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
         }
 
-        function userSeekDelta(delta) {
-            const newTime = Math.max(0, getCurrentTime() + delta);
-            seekToTime(newTime);
-            sendSignal('SEEK', { time: newTime });
-        }
-
-        function userChangeSpeed(rate) {
-            const speed = parseFloat(rate);
-            setPlaybackRate(speed);
-            sendSignal('RATE', { rate: speed });
-        }
-
-        function updatePlayPauseButton(isPlaying) {
-            const icon = document.getElementById('playIcon');
-            const text = document.getElementById('playText');
-            if (isPlaying) {
-                icon.className = "fa-solid fa-pause";
-                text.innerText = "Pause";
-            } else {
-                icon.className = "fa-solid fa-play";
-                text.innerText = "Play";
-            }
-        }
-
-        // Player Core
-        function setupPlayer(url, onReadyCallback) {
-            const ytId = getYouTubeId(url);
-            const nativeVideo = document.getElementById('nativePlayer');
-            const ytDiv = document.getElementById('ytPlayer');
-
-            if(ytId) {
-                currentVideoType = 'youtube';
-                nativeVideo.classList.add('hidden');
-                ytDiv.classList.remove('hidden');
-
-                const attachYT = () => {
-                    if (ytPlayer && ytPlayer.loadVideoById) {
-                        ytPlayer.loadVideoById(ytId);
-                        if(onReadyCallback) onReadyCallback();
-                    } else {
-                        ytPlayer = new YT.Player('ytPlayer', {
-                            videoId: ytId,
-                            playerVars: { 'autoplay': 0, 'controls': 1, 'playsinline': 1, 'enablejsapi': 1 },
-                            events: {
-                                'onReady': () => { if(onReadyCallback) onReadyCallback(); },
-                                'onStateChange': onYouTubeStateChange,
-                                'onPlaybackRateChange': (e) => {
-                                    if(isInternalSync) return;
-                                    document.getElementById('speedSelect').value = e.data;
-                                    sendSignal('RATE', { rate: e.data });
-                                }
-                            }
-                        });
-                    }
-                };
-
-                if(window.YT && window.YT.Player) attachYT();
-                else {
-                    const timer = setInterval(() => {
-                        if(window.YT && window.YT.Player) {
-                            clearInterval(timer);
-                            attachYT();
-                        }
-                    }, 150);
-                }
-            } else {
-                currentVideoType = 'native';
-                ytDiv.classList.add('hidden');
-                nativeVideo.classList.remove('hidden');
-                nativeVideo.src = url;
-
-                nativeVideo.onplay = () => { updatePlayPauseButton(true); if(!isInternalSync) sendSignal('PLAY', { time: nativeVideo.currentTime }); };
-                nativeVideo.onpause = () => { updatePlayPauseButton(false); if(!isInternalSync) sendSignal('PAUSE', { time: nativeVideo.currentTime }); };
-                nativeVideo.onseeked = () => { if(!isInternalSync) sendSignal('SEEK', { time: nativeVideo.currentTime }); };
-                nativeVideo.onratechange = () => { if(!isInternalSync) sendSignal('RATE', { rate: nativeVideo.playbackRate }); };
-
-                if(onReadyCallback) onReadyCallback();
-            }
-        }
-
-        function onYouTubeStateChange(event) {
-            if(isInternalSync) return;
-            const time = ytPlayer.getCurrentTime();
-            if(event.data === YT.PlayerState.PLAYING) {
-                updatePlayPauseButton(true);
-                sendSignal('PLAY', { time });
-            } else if(event.data === YT.PlayerState.PAUSED) {
-                updatePlayPauseButton(false);
-                sendSignal('PAUSE', { time });
-            }
-        }
-
-        setInterval(() => {
-            if (isInternalSync) return;
-            const currentTime = getCurrentTime();
-            if (Math.abs(currentTime - lastKnownTime) > 1.8 && isPlayerPlaying()) {
-                sendSignal('SEEK', { time: currentTime });
-            }
-            lastKnownTime = currentTime;
-        }, 500);
-
-        function playVideo() {
-            try {
-                if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.playVideo) ytPlayer.playVideo();
-                else document.getElementById('nativePlayer').play();
-                updatePlayPauseButton(true);
-            } catch(e) {
-                document.getElementById('syncOverlay').classList.remove('hidden');
-            }
-        }
-
-        function pauseVideo() {
-            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
-            else document.getElementById('nativePlayer').pause();
-            updatePlayPauseButton(false);
-        }
-
-        function seekToTime(seconds) {
-            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(seconds, true);
-            else document.getElementById('nativePlayer').currentTime = seconds;
-            lastKnownTime = seconds;
-        }
-
-        function setPlaybackRate(rate) {
-            document.getElementById('speedSelect').value = rate;
-            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(rate);
-            else document.getElementById('nativePlayer').playbackRate = rate;
-        }
-
-        function getCurrentTime() {
-            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) return ytPlayer.getCurrentTime();
-            return document.getElementById('nativePlayer').currentTime || 0;
-        }
-
-        function getCurrentSpeed() {
-            return parseFloat(document.getElementById('speedSelect').value) || 1;
-        }
-
-        function isPlayerPlaying() {
-            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.getPlayerState) {
-                return ytPlayer.getPlayerState() === YT.PlayerState.PLAYING;
-            }
-            const nat = document.getElementById('nativePlayer');
-            return !!(nat.currentTime > 0 && !nat.paused && !nat.ended && nat.readyState > 2);
-        }
-
-        function unlockPlayback() {
-            document.getElementById('syncOverlay').classList.add('hidden');
-            playVideo();
-            if(conn && conn.open) conn.send({ type: 'REQUEST_FULL_STATE' });
-        }
-
-        function showTheaterView(isHostRole) {
-            document.getElementById('authScreen').classList.add('hidden');
-            document.getElementById('dashboardScreen').classList.add('hidden');
+        // UI & Screen Handlers
+        function showTheaterScreen(isHostRole) {
+            document.getElementById('setupScreen').classList.add('hidden');
             document.getElementById('theaterScreen').classList.remove('hidden');
+            document.getElementById('roomMemberBadge').classList.remove('hidden');
+
             const badge = document.getElementById('roleBadge');
             badge.innerText = isHostRole ? "Host" : "Guest";
             badge.className = isHostRole 
@@ -1186,19 +724,31 @@
                 : "text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30";
         }
 
+        function updateMemberBadge(count) {
+            document.getElementById('memberCountText').innerText = `👥 ${count}/6 in Room`;
+        }
+
         function copyFullLink() {
-            if(currentRoomId && currentVideoSource) {
-                const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}&v=${encodeURIComponent(currentVideoSource)}`;
-                navigator.clipboard.writeText(url).then(() => alert("Invite Link copied to clipboard!"));
+            if(currentRoomId) {
+                const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}`;
+                navigator.clipboard.writeText(url).then(() => {
+                    alert("Invite link copied! Share it with up to 5 friends.");
+                });
             }
         }
 
+        function leaveRoom() {
+            if(confirm("Do you want to exit the room?")) {
+                window.location.href = window.location.pathname;
+            }
+        }
+
+        // Auto join if ?room= query param is in URL
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const rKey = params.get('room');
-            const vParam = params.get('v');
             if(rKey) {
-                joinAsGuest(rKey, vParam);
+                document.getElementById('manualJoinCode').value = rKey;
             }
         });
     </script>
