@@ -15,14 +15,13 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
-        #chatMessages::-webkit-scrollbar { width: 4px; }
-        #chatMessages::-webkit-scrollbar-track { background: transparent; }
-        #chatMessages::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        #chatMessages::-webkit-scrollbar, #friendsListContainer::-webkit-scrollbar { width: 4px; }
+        #chatMessages::-webkit-scrollbar-thumb, #friendsListContainer::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
 
-    <!-- Header -->
+    <!-- Top Header -->
     <header class="p-3 sm:p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex justify-between items-center sticky top-0 z-40">
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-clapperboard text-rose-500 text-xl"></i>
@@ -35,7 +34,10 @@
             </span>
             <div id="userProfileBadge" class="hidden flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span id="navUsername" class="text-xs font-bold text-slate-200">User</span>
+                <div class="text-left">
+                    <div id="navFullName" class="text-xs font-bold text-slate-100 leading-tight">Name</div>
+                    <div id="navUsername" class="text-[10px] text-slate-400 font-mono">@user</div>
+                </div>
                 <button onclick="handleLogout()" class="ml-2 px-2.5 py-1 bg-slate-800 hover:bg-rose-950/60 hover:text-rose-400 text-xs rounded-lg border border-slate-700 transition">
                     Logout
                 </button>
@@ -51,7 +53,7 @@
             </div>
             <div class="flex-1">
                 <h4 class="text-sm font-bold text-white" id="inviterName">Friend invited you!</h4>
-                <p class="text-xs text-slate-400 mt-0.5">Wants to watch a video together right now.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Invited you to watch a video together.</p>
                 <div class="flex gap-2 mt-3">
                     <button onclick="acceptInvite()" class="flex-1 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition">
                         Accept & Watch
@@ -93,20 +95,34 @@
                 </button>
             </form>
 
-            <!-- Signup Form -->
-            <form id="signupForm" onsubmit="handleSignup(event)" class="space-y-4 hidden">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Choose Username:</label>
-                    <input type="text" id="signupUsername" placeholder="e.g. waji007" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+            <!-- Signup Form with Name & Surname -->
+            <form id="signupForm" onsubmit="handleSignup(event)" class="space-y-3.5 hidden">
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">First Name:</label>
+                        <input type="text" id="signupFirstName" placeholder="e.g. Wajahat" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Surname:</label>
+                        <input type="text" id="signupLastName" placeholder="e.g. Ali" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                    </div>
                 </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Username (ID for friends to find you):</label>
+                    <input type="text" id="signupUsername" placeholder="e.g. wajahat01" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                </div>
+
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-1">Email:</label>
-                    <input type="email" id="signupEmail" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                    <input type="email" id="signupEmail" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
                 </div>
+
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-1">Password (min 6 characters):</label>
-                    <input type="password" id="signupPassword" minlength="6" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                    <input type="password" id="signupPassword" minlength="6" required class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
                 </div>
+
                 <button type="submit" id="signupSubmitBtn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 font-bold rounded-lg transition shadow-lg shadow-emerald-600/30">
                     Create Account
                 </button>
@@ -118,13 +134,14 @@
         <!-- 2. DASHBOARD SCREEN -->
         <div id="dashboardScreen" class="w-full hidden grid grid-cols-1 md:grid-cols-3 gap-6">
             
+            <!-- Left 2 Cols: Party Launchers -->
             <div class="md:col-span-2 space-y-6">
                 <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
                     <h3 class="text-base font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-film text-rose-500"></i> Start a Watch Party
                     </h3>
                     <div>
-                        <label class="block text-xs text-slate-400 mb-1">Paste YouTube URL or Direct MP4:</label>
+                        <label class="block text-xs text-slate-400 mb-1">Paste YouTube URL or Direct MP4 Link:</label>
                         <input type="text" id="dashboardVideoUrl" placeholder="https://www.youtube.com/watch?v=..." 
                                class="w-full p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-rose-500">
                     </div>
@@ -145,29 +162,50 @@
                 </div>
             </div>
 
-            <!-- Friends Column -->
-            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col h-[460px]">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-user-group text-rose-500"></i> Friends List
-                    </h3>
-                    <span id="onlineCount" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-400 font-bold">0 Online</span>
-                </div>
-
-                <div class="mt-3 flex gap-2">
-                    <input type="text" id="searchFriendUsername" placeholder="Search friend's username..." 
-                           class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
-                    <button onclick="handleAddFriend()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition">
-                        Add
+            <!-- Right 1 Col: Friends Panel with 2 TABS -->
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col h-[480px]">
+                
+                <!-- Friends Navigation Tabs -->
+                <div class="flex border-b border-slate-800 pb-2 mb-3">
+                    <button id="tabMyFriendsBtn" onclick="switchFriendsTab('myFriends')" class="flex-1 text-xs font-bold text-rose-500 border-b-2 border-rose-500 pb-1.5 transition">
+                        My Friends (<span id="myFriendsCount">0</span>)
+                    </button>
+                    <button id="tabFindFriendsBtn" onclick="switchFriendsTab('findFriends')" class="flex-1 text-xs font-bold text-slate-400 border-b-2 border-transparent pb-1.5 transition">
+                        <i class="fa-solid fa-magnifying-glass mr-1"></i> Find Friends
                     </button>
                 </div>
-                <div id="addFriendAlert" class="hidden text-[10px] mt-1 text-center font-semibold"></div>
 
-                <div id="friendsListContainer" class="flex-1 overflow-y-auto mt-4 space-y-2 pr-1">
-                    <div class="text-center text-xs text-slate-500 mt-10">
-                        No friends added yet.<br>Add friends by username above!
+                <!-- TAB 1: MY FOLLOWED FRIENDS LIST -->
+                <div id="myFriendsSection" class="flex-1 flex flex-col overflow-hidden">
+                    <div class="flex justify-between items-center mb-2 px-1 text-[11px] text-slate-400 font-semibold">
+                        <span>People you follow:</span>
+                        <span id="onlineCount" class="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full font-mono text-[10px]">0 Online</span>
+                    </div>
+                    <div id="friendsListContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                        <div class="text-center text-xs text-slate-500 mt-16">
+                            You haven't followed any friends yet.<br>Click "Find Friends" to add them!
+                        </div>
                     </div>
                 </div>
+
+                <!-- TAB 2: FIND & FOLLOW FRIENDS -->
+                <div id="findFriendsSection" class="flex-1 flex flex-col overflow-hidden hidden space-y-3">
+                    <div class="flex gap-2">
+                        <input type="text" id="searchFriendUsername" placeholder="Search by username..." 
+                               class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
+                        <button onclick="handleSearchUser()" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1">
+                            <i class="fa-solid fa-search"></i> Find
+                        </button>
+                    </div>
+
+                    <!-- Search Result Card Container -->
+                    <div id="searchResultContainer" class="flex-1 overflow-y-auto pr-1">
+                        <div class="text-center text-xs text-slate-500 mt-16">
+                            Enter a friend's username to search and follow them.
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
         </div>
@@ -185,12 +223,13 @@
                 </div>
 
                 <div class="flex items-center gap-2">
+                    <!-- Dropdown for followed friends -->
                     <div class="relative">
                         <button onclick="toggleFriendInviteMenu()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm">
-                            <i class="fa-solid fa-user-plus"></i> Invite Friend
+                            <i class="fa-solid fa-user-plus"></i> Invite Friends
                         </button>
-                        <div id="friendInviteMenu" class="hidden absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1">
-                            <div class="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase">Select friend to send invite:</div>
+                        <div id="friendInviteMenu" class="hidden absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1">
+                            <div class="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase">Click friend to send invite:</div>
                             <div id="inRoomFriendsList" class="max-h-48 overflow-y-auto space-y-1"></div>
                         </div>
                     </div>
@@ -294,9 +333,10 @@
         let friendsUnsubscribe = null;
         let invitesUnsubscribe = null;
         let activePendingInvite = null;
+        let myFollowedFriendsList = [];
 
         /*************************************************************
-         * 2. TAB SWITCH & AUTHENTICATION
+         * 2. AUTHENTICATION & PROFILES
          *************************************************************/
         function switchAuthTab(type) {
             const loginForm = document.getElementById('loginForm');
@@ -327,14 +367,24 @@
                     if(doc.exists) {
                         currentUserData = doc.data();
                     } else {
-                        currentUserData = { uid: user.uid, email: user.email, username: user.email.split('@')[0], friends: [] };
+                        currentUserData = {
+                            uid: user.uid,
+                            email: user.email,
+                            firstName: user.email.split('@')[0],
+                            lastName: '',
+                            displayName: user.email.split('@')[0],
+                            username: user.email.split('@')[0],
+                            friends: []
+                        };
                         await db.collection('users').doc(user.uid).set(currentUserData, { merge: true });
                     }
 
                     db.collection('users').doc(user.uid).update({ isOnline: true, lastSeen: Date.now() });
 
                     document.getElementById('userProfileBadge').classList.remove('hidden');
-                    document.getElementById('navUsername').innerText = currentUserData.username;
+                    document.getElementById('navFullName').innerText = currentUserData.displayName || currentUserData.firstName || currentUserData.username;
+                    document.getElementById('navUsername').innerText = '@' + currentUserData.username;
+
                     showDashboard();
                     listenToFriends();
                     listenToIncomingInvites();
@@ -370,23 +420,29 @@
 
         async function handleSignup(e) {
             e.preventDefault();
+            const firstName = document.getElementById('signupFirstName').value.trim();
+            const lastName = document.getElementById('signupLastName').value.trim();
             const username = document.getElementById('signupUsername').value.trim().toLowerCase();
             const email = document.getElementById('signupEmail').value.trim();
             const pass = document.getElementById('signupPassword').value.trim();
 
-            if(!/^[a-z0-9_]{3,16}$/.test(username)) {
-                return showAuthAlert("Username must be 3-16 characters (letters, numbers, underscores).");
-            }
+            if(!firstName) return showAuthAlert("Please enter your First Name.");
+            if(!username) return showAuthAlert("Please enter a username.");
 
             try {
                 const check = await db.collection('users').where('username', '==', username).get();
                 if(!check.empty) {
-                    return showAuthAlert("Username is already taken! Try another.");
+                    return showAuthAlert("Username is already taken! Please choose another.");
                 }
 
                 const res = await auth.createUserWithEmailAndPassword(email, pass);
+                const fullName = `${firstName} ${lastName}`.trim();
+                
                 await db.collection('users').doc(res.user.uid).set({
                     uid: res.user.uid,
+                    firstName: firstName,
+                    lastName: lastName,
+                    displayName: fullName,
                     username: username,
                     email: email,
                     friends: [],
@@ -425,43 +481,107 @@
         }
 
         /*************************************************************
-         * 3. FRIENDS & DIRECT INVITES
+         * 3. FRIENDS & SEARCH TABS SYSTEM
          *************************************************************/
-        async function handleAddFriend() {
-            const searchInput = document.getElementById('searchFriendUsername');
-            const targetUsername = searchInput.value.trim().toLowerCase();
-            const alertBox = document.getElementById('addFriendAlert');
+        function switchFriendsTab(tab) {
+            const myFriendsSec = document.getElementById('myFriendsSection');
+            const findFriendsSec = document.getElementById('findFriendsSection');
+            const myFriendsBtn = document.getElementById('tabMyFriendsBtn');
+            const findFriendsBtn = document.getElementById('tabFindFriendsBtn');
 
-            if(!targetUsername) return;
-            if(targetUsername === currentUserData.username) {
-                alertBox.innerText = "You cannot add yourself!";
-                alertBox.className = "text-[10px] mt-1 text-center font-semibold text-amber-400";
-                alertBox.classList.remove('hidden');
+            if(tab === 'myFriends') {
+                myFriendsSec.classList.remove('hidden');
+                findFriendsSec.classList.add('hidden');
+                myFriendsBtn.className = "flex-1 text-xs font-bold text-rose-500 border-b-2 border-rose-500 pb-1.5 transition";
+                findFriendsBtn.className = "flex-1 text-xs font-bold text-slate-400 border-b-2 border-transparent pb-1.5 transition";
+            } else {
+                findFriendsSec.classList.remove('hidden');
+                myFriendsSec.classList.add('hidden');
+                findFriendsBtn.className = "flex-1 text-xs font-bold text-rose-500 border-b-2 border-rose-500 pb-1.5 transition";
+                myFriendsBtn.className = "flex-1 text-xs font-bold text-slate-400 border-b-2 border-transparent pb-1.5 transition";
+            }
+        }
+
+        // Search user by username
+        async function handleSearchUser() {
+            const input = document.getElementById('searchFriendUsername');
+            const queryName = input.value.trim().toLowerCase();
+            const container = document.getElementById('searchResultContainer');
+
+            if(!queryName) return;
+
+            if(queryName === currentUserData.username.toLowerCase()) {
+                container.innerHTML = `<div class="p-3 text-center text-xs text-amber-400 font-semibold bg-amber-500/10 rounded-xl border border-amber-500/20">That's your own username! Search for your friends.</div>`;
                 return;
             }
 
-            try {
-                const query = await db.collection('users').where('username', '==', targetUsername).get();
-                if(query.empty) {
-                    alertBox.innerText = "User not found!";
-                    alertBox.className = "text-[10px] mt-1 text-center font-semibold text-rose-400";
-                } else {
-                    const targetUser = query.docs[0].data();
-                    await db.collection('users').doc(currentUserData.uid).update({
-                        friends: firebase.firestore.FieldValue.arrayUnion(targetUser.uid)
-                    });
-                    await db.collection('users').doc(targetUser.uid).update({
-                        friends: firebase.firestore.FieldValue.arrayUnion(currentUserData.uid)
-                    });
+            container.innerHTML = `<div class="text-center text-xs text-slate-400 mt-6"><i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Searching for @${queryName}...</div>`;
 
-                    alertBox.innerText = `Added ${targetUser.username} to your friends!`;
-                    alertBox.className = "text-[10px] mt-1 text-center font-semibold text-emerald-400";
-                    searchInput.value = '';
+            try {
+                const snap = await db.collection('users').where('username', '==', queryName).get();
+                if(snap.empty) {
+                    container.innerHTML = `<div class="p-3 text-center text-xs text-rose-400 font-semibold bg-rose-500/10 rounded-xl border border-rose-500/20">No user found with username "@${queryName}"</div>`;
+                    return;
                 }
-                alertBox.classList.remove('hidden');
-                setTimeout(() => alertBox.classList.add('hidden'), 3500);
-            } catch(err) {
-                console.error(err);
+
+                const target = snap.docs[0].data();
+                const isAlreadyFriend = currentUserData.friends && currentUserData.friends.includes(target.uid);
+
+                const fullName = target.displayName || (target.firstName ? `${target.firstName} ${target.lastName || ''}`.trim() : target.username);
+
+                container.innerHTML = `
+                    <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between shadow-md">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-9 h-9 rounded-full bg-rose-600/20 text-rose-400 font-bold flex items-center justify-center text-xs uppercase border border-rose-500/30">
+                                ${target.firstName ? target.firstName[0] : target.username[0]}
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white">${fullName}</div>
+                                <div class="text-[10px] text-slate-400 font-mono">@${target.username}</div>
+                            </div>
+                        </div>
+                        <div>
+                            ${isAlreadyFriend ? `
+                                <button onclick="handleUnfollowUser('${target.uid}')" class="px-3 py-1.5 bg-slate-700 hover:bg-rose-900/60 text-slate-200 hover:text-rose-300 text-xs font-bold rounded-lg transition">
+                                    Following <i class="fa-solid fa-check ml-1 text-emerald-400"></i>
+                                </button>
+                            ` : `
+                                <button onclick="handleFollowUser('${target.uid}')" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-md shadow-rose-600/30 flex items-center gap-1">
+                                    <i class="fa-solid fa-user-plus"></i> Follow
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            } catch(e) {
+                console.error(e);
+                container.innerHTML = `<div class="text-center text-xs text-rose-400 mt-4">Error searching user.</div>`;
+            }
+        }
+
+        async function handleFollowUser(targetUid) {
+            try {
+                await db.collection('users').doc(currentUserData.uid).update({
+                    friends: firebase.firestore.FieldValue.arrayUnion(targetUid)
+                });
+                currentUserData.friends = currentUserData.friends || [];
+                currentUserData.friends.push(targetUid);
+                handleSearchUser(); // refresh button state
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function handleUnfollowUser(targetUid) {
+            if(!confirm("Unfollow this friend?")) return;
+            try {
+                await db.collection('users').doc(currentUserData.uid).update({
+                    friends: firebase.firestore.FieldValue.arrayRemove(targetUid)
+                });
+                currentUserData.friends = (currentUserData.friends || []).filter(id => id !== targetUid);
+                handleSearchUser();
+            } catch(e) {
+                console.error(e);
             }
         }
 
@@ -469,14 +589,20 @@
             friendsUnsubscribe = db.collection('users').doc(currentUserData.uid).onSnapshot(async (doc) => {
                 const uData = doc.data();
                 if(!uData || !uData.friends || uData.friends.length === 0) {
+                    myFollowedFriendsList = [];
                     renderFriendsList([]);
                     return;
                 }
 
-                const friendsSnap = await db.collection('users').where('uid', 'in', uData.friends.slice(0, 10)).get();
-                const list = [];
-                friendsSnap.forEach(d => list.push(d.data()));
-                renderFriendsList(list);
+                try {
+                    const snap = await db.collection('users').where('uid', 'in', uData.friends.slice(0, 10)).get();
+                    const list = [];
+                    snap.forEach(d => list.push(d.data()));
+                    myFollowedFriendsList = list;
+                    renderFriendsList(list);
+                } catch(e) {
+                    console.error("Error fetching friends:", e);
+                }
             });
         }
 
@@ -484,10 +610,13 @@
             const container = document.getElementById('friendsListContainer');
             const inRoomList = document.getElementById('inRoomFriendsList');
             const countBadge = document.getElementById('onlineCount');
+            const totalFriendsCount = document.getElementById('myFriendsCount');
+
+            totalFriendsCount.innerText = friends.length;
 
             if(friends.length === 0) {
-                container.innerHTML = '<div class="text-center text-xs text-slate-500 mt-10">No friends added yet.<br>Add friends by username above!</div>';
-                inRoomList.innerHTML = '<div class="text-[10px] text-slate-500 p-2 text-center">No friends available</div>';
+                container.innerHTML = '<div class="text-center text-xs text-slate-500 mt-16">You haven\'t followed any friends yet.<br>Click "Find Friends" to add them!</div>';
+                inRoomList.innerHTML = '<div class="text-[10px] text-slate-500 p-2 text-center">No followed friends available</div>';
                 countBadge.innerText = '0 Online';
                 return;
             }
@@ -498,32 +627,45 @@
 
             friends.forEach(f => {
                 if(f.isOnline) onlineCount++;
+                const fullName = f.displayName || (f.firstName ? `${f.firstName} ${f.lastName || ''}`.trim() : f.username);
 
+                // Dashboard Friends Item
                 const item = document.createElement('div');
                 item.className = "p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between";
                 item.innerHTML = `
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2.5">
                         <span class="w-2.5 h-2.5 rounded-full ${f.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}"></span>
                         <div>
-                            <div class="text-xs font-bold text-white">${f.username}</div>
-                            <div class="text-[10px] text-slate-400">${f.isOnline ? 'Online' : 'Offline'}</div>
+                            <div class="text-xs font-bold text-white">${fullName}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">@${f.username}</div>
                         </div>
                     </div>
-                    <button onclick="inviteFriendDirectly('${f.uid}', '${f.username}')" 
-                            class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-[11px] font-bold rounded-lg transition ${!f.isOnline ? 'opacity-50' : ''}">
-                        <i class="fa-solid fa-paper-plane mr-1"></i> Invite
-                    </button>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="inviteFriendDirectly('${f.uid}', '${fullName}')" 
+                                class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-[11px] font-bold rounded-lg transition shadow-sm ${!f.isOnline ? 'opacity-60' : ''}">
+                            <i class="fa-solid fa-paper-plane mr-1"></i> Invite
+                        </button>
+                        <button onclick="handleUnfollowUser('${f.uid}')" title="Unfollow" class="px-2 py-1 bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 text-xs rounded-lg transition border border-slate-700">
+                            <i class="fa-solid fa-user-minus"></i>
+                        </button>
+                    </div>
                 `;
                 container.appendChild(item);
 
+                // In-Room Dropdown Item
                 const dropItem = document.createElement('button');
-                dropItem.className = "w-full text-left p-1.5 hover:bg-slate-800 rounded-lg flex items-center justify-between text-xs transition";
+                dropItem.className = "w-full text-left p-2 hover:bg-slate-800 rounded-lg flex items-center justify-between text-xs transition";
                 dropItem.innerHTML = `
-                    <span class="font-bold ${f.isOnline ? 'text-white' : 'text-slate-400'}">${f.username}</span>
-                    <span class="text-[10px] ${f.isOnline ? 'text-emerald-400' : 'text-slate-600'}">${f.isOnline ? 'Send Invite' : 'Offline'}</span>
+                    <div>
+                        <div class="font-bold ${f.isOnline ? 'text-white' : 'text-slate-400'}">${fullName}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">@${f.username}</div>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded ${f.isOnline ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}">
+                        ${f.isOnline ? 'Send Invite' : 'Offline'}
+                    </span>
                 `;
                 dropItem.onclick = () => {
-                    sendDirectInvite(f.uid, f.username);
+                    sendDirectInvite(f.uid, fullName);
                     toggleFriendInviteMenu();
                 };
                 inRoomList.appendChild(dropItem);
@@ -538,10 +680,12 @@
                 return;
             }
 
+            const senderName = currentUserData.displayName || currentUserData.firstName || currentUserData.username;
+
             await db.collection('invites').add({
                 toUid: friendUid,
                 fromUid: currentUserData.uid,
-                fromUsername: currentUserData.username,
+                fromUsername: senderName,
                 roomId: currentRoomId,
                 videoUrl: currentVideoSource,
                 status: 'pending',
@@ -750,7 +894,7 @@
             }
         }
 
-        // Live Chat
+        // Live Chat Handlers
         function handleSendChat(event) {
             event.preventDefault();
             const input = document.getElementById('chatInput');
@@ -758,12 +902,12 @@
             if(!text) return;
 
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const myName = currentUserData ? currentUserData.username : (isHost ? 'Host' : 'Guest');
+            const myDisplayName = currentUserData ? (currentUserData.displayName || currentUserData.firstName || currentUserData.username) : (isHost ? 'Host' : 'Guest');
 
-            appendChatMessage({ sender: myName, text: text, time: timeStr, isMe: true });
+            appendChatMessage({ sender: myDisplayName, text: text, time: timeStr, isMe: true });
 
             if(conn && conn.open) {
-                conn.send({ type: 'CHAT_MSG', sender: myName, text: text, time: timeStr });
+                conn.send({ type: 'CHAT_MSG', sender: myDisplayName, text: text, time: timeStr });
             }
             input.value = '';
         }
