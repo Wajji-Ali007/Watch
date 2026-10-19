@@ -8,9 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PeerJS for video sync -->
+    <!-- PeerJS -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <!-- Firebase SDKs (Compat for vanilla JS) -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -20,32 +20,33 @@
         #chatMessages::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
 
-    <!-- Top Navigation -->
-    <header class="p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex justify-between items-center sticky top-0 z-40">
+    <!-- Header -->
+    <header class="p-3 sm:p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex justify-between items-center sticky top-0 z-40">
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-clapperboard text-rose-500 text-xl"></i>
             <span class="text-xl font-black tracking-tight text-white">Watch<span class="text-rose-500">Together</span></span>
         </div>
         
-        <!-- User Info / Auth Buttons -->
         <div id="navUserSection" class="flex items-center gap-3">
-            <span id="loadingAuth" class="text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Checking account...</span>
+            <span id="loadingAuth" class="text-xs text-slate-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Checking account...
+            </span>
             <div id="userProfileBadge" class="hidden flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span id="navUsername" class="text-xs font-bold text-slate-200">User</span>
-                <button onclick="handleLogout()" class="ml-2 px-2.5 py-1 bg-slate-800 hover:bg-rose-950/60 hover:text-rose-400 text-xs rounded border border-slate-700 transition">
+                <button onclick="handleLogout()" class="ml-2 px-2.5 py-1 bg-slate-800 hover:bg-rose-950/60 hover:text-rose-400 text-xs rounded-lg border border-slate-700 transition">
                     Logout
                 </button>
             </div>
         </div>
     </header>
 
-    <!-- Real-Time Incoming Invite Banner (Modal) -->
+    <!-- Incoming Invite Popup -->
     <div id="incomingInviteModal" class="hidden fixed top-20 right-4 sm:right-6 z-50 bg-slate-900 border-2 border-rose-500 shadow-2xl rounded-2xl p-4 max-w-sm animate-bounce">
         <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full bg-rose-600/20 text-rose-500 flex items-center justify-center text-lg">
+            <div class="w-10 h-10 rounded-full bg-rose-600/20 text-rose-500 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-video"></i>
             </div>
             <div class="flex-1">
@@ -56,23 +57,23 @@
                         Accept & Watch
                     </button>
                     <button onclick="declineInvite()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition">
-                        Ignore
+                        Decline
                     </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- MAIN APP WRAPPER -->
+    <!-- Main Container -->
     <main class="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full max-w-6xl mx-auto">
         
-        <!-- 1. AUTH SCREEN (Login & Sign Up) -->
+        <!-- 1. AUTH SCREEN (Login / Sign Up) -->
         <div id="authScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
             <div class="flex border-b border-slate-800">
-                <button id="tabLoginBtn" onclick="switchAuthTab('login')" class="flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition">
+                <button id="tabLoginBtn" type="button" onclick="switchAuthTab('login')" class="flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition cursor-pointer">
                     Login
                 </button>
-                <button id="tabSignupBtn" onclick="switchAuthTab('signup')" class="flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition">
+                <button id="tabSignupBtn" type="button" onclick="switchAuthTab('signup')" class="flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition cursor-pointer">
                     Sign Up
                 </button>
             </div>
@@ -96,67 +97,63 @@
             <form id="signupForm" onsubmit="handleSignup(event)" class="space-y-4 hidden">
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-1">Choose Username:</label>
-                    <input type="text" id="signupUsername" placeholder="e.g. waji786" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                    <input type="text" id="signupUsername" placeholder="e.g. waji007" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-1">Email:</label>
                     <input type="email" id="signupEmail" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Password:</label>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Password (min 6 characters):</label>
                     <input type="password" id="signupPassword" minlength="6" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white">
                 </div>
                 <button type="submit" id="signupSubmitBtn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 font-bold rounded-lg transition shadow-lg shadow-emerald-600/30">
-                    Create My Account
+                    Create Account
                 </button>
             </form>
 
-            <div id="authAlert" class="hidden p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center"></div>
+            <div id="authAlert" class="hidden p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center font-medium"></div>
         </div>
 
-        <!-- 2. DASHBOARD SCREEN (Create Room + Friends Panel) -->
+        <!-- 2. DASHBOARD SCREEN -->
         <div id="dashboardScreen" class="w-full hidden grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <!-- Left 2 Cols: Create / Join Room -->
             <div class="md:col-span-2 space-y-6">
-                <!-- Create Room Box -->
                 <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
                     <h3 class="text-base font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-square-plus text-rose-500"></i> Start a Watch Party
+                        <i class="fa-solid fa-film text-rose-500"></i> Start a Watch Party
                     </h3>
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Paste YouTube URL or Direct MP4:</label>
                         <input type="text" id="dashboardVideoUrl" placeholder="https://www.youtube.com/watch?v=..." 
-                               class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-rose-500">
+                               class="w-full p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-rose-500">
                     </div>
                     <button onclick="handleDashboardCreateRoom()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-sm transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-play"></i> Launch Room & Select Friends
+                        <i class="fa-solid fa-play"></i> Launch Room & Invite Friends
                     </button>
                 </div>
 
-                <!-- Manual Join Box -->
-                <div class="bg-slate-900/60 border border-slate-800/80 p-5 rounded-2xl flex items-center justify-between gap-4">
-                    <div class="flex-1">
-                        <div class="text-xs font-bold text-slate-300">Have a direct Room Key?</div>
-                        <input type="text" id="manualJoinKey" placeholder="Paste Room Key here..." 
+                <div class="bg-slate-900/60 border border-slate-800/80 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="flex-1 w-full">
+                        <div class="text-xs font-bold text-slate-300">Have a direct Room Key or Link?</div>
+                        <input type="text" id="manualJoinKey" placeholder="Paste Key or Invite Link here..." 
                                class="w-full mt-1.5 p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-white focus:outline-none focus:border-rose-500">
                     </div>
-                    <button onclick="handleDashboardManualJoin()" class="mt-4 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-700 transition">
+                    <button onclick="handleDashboardManualJoin()" class="w-full sm:w-auto sm:mt-5 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-700 transition">
                         Join Key
                     </button>
                 </div>
             </div>
 
-            <!-- Right 1 Col: Friends & Online System -->
+            <!-- Friends Column -->
             <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col h-[460px]">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                     <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-user-group text-rose-500"></i> Friends & Direct Invites
+                        <i class="fa-solid fa-user-group text-rose-500"></i> Friends List
                     </h3>
                     <span id="onlineCount" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-400 font-bold">0 Online</span>
                 </div>
 
-                <!-- Add Friend Input -->
                 <div class="mt-3 flex gap-2">
                     <input type="text" id="searchFriendUsername" placeholder="Search friend's username..." 
                            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
@@ -166,7 +163,6 @@
                 </div>
                 <div id="addFriendAlert" class="hidden text-[10px] mt-1 text-center font-semibold"></div>
 
-                <!-- Friend List -->
                 <div id="friendsListContainer" class="flex-1 overflow-y-auto mt-4 space-y-2 pr-1">
                     <div class="text-center text-xs text-slate-500 mt-10">
                         No friends added yet.<br>Add friends by username above!
@@ -176,10 +172,9 @@
 
         </div>
 
-        <!-- 3. THEATER ROOM SCREEN (Synced Video & Controls & Chat) -->
-        <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-4">
+        <!-- 3. THEATER ROOM SCREEN -->
+        <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-3">
             
-            <!-- Controls Bar with In-App Friends Inviter -->
             <div class="w-full bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-lg">
                 <div class="flex items-center gap-3">
                     <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">Host</span>
@@ -190,14 +185,12 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <!-- Quick Friend Invite Dropdown -->
-                    <div id="inviteFriendDropdownContainer" class="relative">
+                    <div class="relative">
                         <button onclick="toggleFriendInviteMenu()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm">
                             <i class="fa-solid fa-user-plus"></i> Invite Friend
                         </button>
-                        <!-- Popup menu -->
                         <div id="friendInviteMenu" class="hidden absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1">
-                            <div class="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase">Click friend to send invite:</div>
+                            <div class="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase">Select friend to send invite:</div>
                             <div id="inRoomFriendsList" class="max-h-48 overflow-y-auto space-y-1"></div>
                         </div>
                     </div>
@@ -211,12 +204,10 @@
                 </div>
             </div>
 
-            <!-- Video Player -->
             <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
                 <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
                 <video id="nativePlayer" class="w-full h-full hidden" controls playsinline></video>
 
-                <!-- Tap to Sync Overlay for Mobile -->
                 <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-30 hidden p-4 text-center">
                     <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
                         <i class="fa-solid fa-play ml-1"></i>
@@ -228,7 +219,7 @@
                 </div>
             </div>
 
-            <!-- SYNCED QUICK CONTROLS -->
+            <!-- Controls -->
             <div class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2 shadow-md">
                 <div class="flex items-center gap-2">
                     <button onclick="userSeekDelta(-10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95">
@@ -244,7 +235,7 @@
 
                 <div class="flex items-center gap-1.5">
                     <span class="text-[11px] font-bold text-slate-400 hidden sm:inline">Speed:</span>
-                    <select id="speedSelect" onchange="userChangeSpeed(this.value)" class="bg-slate-800 text-slate-200 text-xs font-bold py-2 px-2 rounded-lg border border-slate-700 focus:outline-none focus:border-rose-500">
+                    <select id="speedSelect" onchange="userChangeSpeed(this.value)" class="bg-slate-800 text-slate-200 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-700 focus:outline-none focus:border-rose-500">
                         <option value="0.5">0.5x</option>
                         <option value="0.75">0.75x</option>
                         <option value="1" selected>1.0x</option>
@@ -255,7 +246,7 @@
                 </div>
             </div>
 
-            <!-- LIVE CHAT SECTION -->
+            <!-- Chat -->
             <div class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-72">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
                     <div class="flex items-center gap-2">
@@ -283,18 +274,18 @@
 
     <script>
         /*************************************************************
-         * 1. FIREBASE CONFIGURATION (PASTE YOUR CONFIG KEYS HERE!)
+         * 1. FIREBASE CONFIGURATION
          *************************************************************/
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyBnrkQAjPeetJWPcYhW4NK4d1SSM15bbEA",
+            authDomain: "mahveenwajahat.firebaseapp.com",
+            projectId: "mahveenwajahat",
+            storageBucket: "mahveenwajahat.firebasestorage.app",
+            messagingSenderId: "1068557622123",
+            appId: "1:1068557622123:web:dfe4300b304c0ab328ca2e",
+            measurementId: "G-Q1M5Z7CDQX"
         };
 
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
@@ -305,38 +296,8 @@
         let activePendingInvite = null;
 
         /*************************************************************
-         * 2. AUTHENTICATION & PROFILE SYSTEM
+         * 2. TAB SWITCH & AUTHENTICATION
          *************************************************************/
-        auth.onAuthStateChanged(async (user) => {
-            document.getElementById('loadingAuth').classList.add('hidden');
-            if (user) {
-                // Fetch user doc
-                const doc = await db.collection('users').doc(user.uid).get();
-                if(doc.exists) {
-                    currentUserData = doc.data();
-                } else {
-                    currentUserData = { uid: user.uid, email: user.email, username: user.email.split('@')[0], friends: [] };
-                    await db.collection('users').doc(user.uid).set(currentUserData, { merge: true });
-                }
-
-                // Set online status
-                db.collection('users').doc(user.uid).update({ isOnline: true, lastSeen: Date.now() });
-
-                // Update UI
-                document.getElementById('userProfileBadge').classList.remove('hidden');
-                document.getElementById('navUsername').innerText = currentUserData.username;
-                showDashboard();
-                listenToFriends();
-                listenToIncomingInvites();
-            } else {
-                currentUserData = null;
-                document.getElementById('userProfileBadge').classList.add('hidden');
-                showAuthScreen();
-                if(friendsUnsubscribe) friendsUnsubscribe();
-                if(invitesUnsubscribe) invitesUnsubscribe();
-            }
-        });
-
         function switchAuthTab(type) {
             const loginForm = document.getElementById('loginForm');
             const signupForm = document.getElementById('signupForm');
@@ -346,15 +307,55 @@
             if(type === 'login') {
                 loginForm.classList.remove('hidden');
                 signupForm.classList.add('hidden');
-                loginBtn.className = "flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition";
-                signupBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
+                loginBtn.className = "flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500 transition cursor-pointer";
+                signupBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition cursor-pointer";
             } else {
                 signupForm.classList.remove('hidden');
                 loginForm.classList.add('hidden');
-                signupBtn.className = "flex-1 pb-3 font-semibold text-emerald-500 border-b-2 border-emerald-500 transition";
-                loginBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
+                signupBtn.className = "flex-1 pb-3 font-semibold text-emerald-500 border-b-2 border-emerald-500 transition cursor-pointer";
+                loginBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition cursor-pointer";
             }
         }
+
+        auth.onAuthStateChanged(async (user) => {
+            const loadingBadge = document.getElementById('loadingAuth');
+            if(loadingBadge) loadingBadge.classList.add('hidden');
+
+            if (user) {
+                try {
+                    const doc = await db.collection('users').doc(user.uid).get();
+                    if(doc.exists) {
+                        currentUserData = doc.data();
+                    } else {
+                        currentUserData = { uid: user.uid, email: user.email, username: user.email.split('@')[0], friends: [] };
+                        await db.collection('users').doc(user.uid).set(currentUserData, { merge: true });
+                    }
+
+                    db.collection('users').doc(user.uid).update({ isOnline: true, lastSeen: Date.now() });
+
+                    document.getElementById('userProfileBadge').classList.remove('hidden');
+                    document.getElementById('navUsername').innerText = currentUserData.username;
+                    showDashboard();
+                    listenToFriends();
+                    listenToIncomingInvites();
+                } catch(e) {
+                    console.error("User profile load error:", e);
+                    showAuthScreen();
+                }
+            } else {
+                currentUserData = null;
+                document.getElementById('userProfileBadge').classList.add('hidden');
+                showAuthScreen();
+                if(friendsUnsubscribe) friendsUnsubscribe();
+                if(invitesUnsubscribe) invitesUnsubscribe();
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if(currentUserData && currentUserData.uid) {
+                db.collection('users').doc(currentUserData.uid).update({ isOnline: false });
+            }
+        });
 
         async function handleLogin(e) {
             e.preventDefault();
@@ -374,14 +375,13 @@
             const pass = document.getElementById('signupPassword').value.trim();
 
             if(!/^[a-z0-9_]{3,16}$/.test(username)) {
-                return showAuthAlert("Username must be 3-16 chars (letters, numbers, underscores).");
+                return showAuthAlert("Username must be 3-16 characters (letters, numbers, underscores).");
             }
 
             try {
-                // Check if username taken
                 const check = await db.collection('users').where('username', '==', username).get();
                 if(!check.empty) {
-                    return showAuthAlert("Username already taken! Choose another.");
+                    return showAuthAlert("Username is already taken! Try another.");
                 }
 
                 const res = await auth.createUserWithEmailAndPassword(email, pass);
@@ -412,8 +412,20 @@
             setTimeout(() => el.classList.add('hidden'), 4500);
         }
 
+        function showAuthScreen() {
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('dashboardScreen').classList.add('hidden');
+            document.getElementById('theaterScreen').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('dashboardScreen').classList.remove('hidden');
+            document.getElementById('theaterScreen').classList.add('hidden');
+        }
+
         /*************************************************************
-         * 3. FRIENDS & DIRECT INVITES SYSTEM
+         * 3. FRIENDS & DIRECT INVITES
          *************************************************************/
         async function handleAddFriend() {
             const searchInput = document.getElementById('searchFriendUsername');
@@ -435,16 +447,14 @@
                     alertBox.className = "text-[10px] mt-1 text-center font-semibold text-rose-400";
                 } else {
                     const targetUser = query.docs[0].data();
-                    // Add to current user's friends list
                     await db.collection('users').doc(currentUserData.uid).update({
                         friends: firebase.firestore.FieldValue.arrayUnion(targetUser.uid)
                     });
-                    // Two-way follow
                     await db.collection('users').doc(targetUser.uid).update({
                         friends: firebase.firestore.FieldValue.arrayUnion(currentUserData.uid)
                     });
 
-                    alertBox.innerText = `Added ${targetUser.username} to friends!`;
+                    alertBox.innerText = `Added ${targetUser.username} to your friends!`;
                     alertBox.className = "text-[10px] mt-1 text-center font-semibold text-emerald-400";
                     searchInput.value = '';
                 }
@@ -463,7 +473,6 @@
                     return;
                 }
 
-                // Fetch friends profiles
                 const friendsSnap = await db.collection('users').where('uid', 'in', uData.friends.slice(0, 10)).get();
                 const list = [];
                 friendsSnap.forEach(d => list.push(d.data()));
@@ -490,7 +499,6 @@
             friends.forEach(f => {
                 if(f.isOnline) onlineCount++;
 
-                // Item for Dashboard
                 const item = document.createElement('div');
                 item.className = "p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between";
                 item.innerHTML = `
@@ -508,7 +516,6 @@
                 `;
                 container.appendChild(item);
 
-                // Item for Inside Room Dropdown
                 const dropItem = document.createElement('button');
                 dropItem.className = "w-full text-left p-1.5 hover:bg-slate-800 rounded-lg flex items-center justify-between text-xs transition";
                 dropItem.innerHTML = `
@@ -525,7 +532,6 @@
             countBadge.innerText = `${onlineCount} Online`;
         }
 
-        // Send In-App Invite
         async function sendDirectInvite(friendUid, friendName) {
             if(!currentRoomId || !currentVideoSource) {
                 alert("Please launch a room first!");
@@ -542,7 +548,7 @@
                 timestamp: Date.now()
             });
 
-            alert(`Invite sent directly to ${friendName}!`);
+            alert(`Direct invite sent to ${friendName}!`);
         }
 
         function inviteFriendDirectly(friendUid, friendName) {
@@ -556,7 +562,6 @@
             });
         }
 
-        // Listen for Incoming Direct Invites
         function listenToIncomingInvites() {
             invitesUnsubscribe = db.collection('invites')
                 .where('toUid', '==', currentUserData.uid)
@@ -578,8 +583,6 @@
             const invite = activePendingInvite;
             await db.collection('invites').doc(invite.id).update({ status: 'accepted' });
             document.getElementById('incomingInviteModal').classList.add('hidden');
-            
-            // Join Room directly
             joinAsGuest(invite.roomId, invite.videoUrl);
         }
 
@@ -590,12 +593,17 @@
         }
 
         function toggleFriendInviteMenu() {
-            const menu = document.getElementById('friendInviteMenu');
-            menu.classList.toggle('hidden');
+            document.getElementById('friendInviteMenu').classList.toggle('hidden');
+        }
+
+        function leaveRoomToDashboard() {
+            if(confirm("Leave this watch room and return to Dashboard?")) {
+                showDashboard();
+            }
         }
 
         /*************************************************************
-         * 4. WATCH TOGETHER SYNC ENGINE & PLAYER (PeerJS)
+         * 4. WATCH TOGETHER SYNC ENGINE (PeerJS)
          *************************************************************/
         let peer = null;
         let conn = null;
@@ -606,6 +614,13 @@
         let ytPlayer = null;
         let isInternalSync = false;
         let lastKnownTime = 0;
+
+        function getYouTubeId(url) {
+            if(!url) return null;
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
 
         function initPeerServer() {
             return new Promise((resolve) => {
@@ -620,7 +635,7 @@
 
         async function handleDashboardCreateRoom() {
             const link = document.getElementById('dashboardVideoUrl').value.trim();
-            if(!link) return alert("Please enter a video URL!");
+            if(!link) return alert("Please enter a valid video URL!");
 
             isHost = true;
             currentVideoSource = link;
@@ -637,8 +652,14 @@
 
         function handleDashboardManualJoin() {
             let key = document.getElementById('manualJoinKey').value.trim();
-            if(!key) return alert("Please enter Room Key!");
-            joinAsGuest(key);
+            if(!key) return alert("Please enter Room Key or Link!");
+            let extractedVideo = null;
+            if (key.includes('?')) {
+                const urlParams = new URLSearchParams(key.split('?')[1]);
+                extractedVideo = urlParams.get('v');
+                key = urlParams.get('room') || key;
+            }
+            joinAsGuest(key, extractedVideo);
         }
 
         async function joinAsGuest(targetKey, initialVideoUrl = null) {
@@ -768,7 +789,7 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // Quick Controls
+        // Synced Controls
         function userTogglePlay() {
             const playing = isPlayerPlaying();
             const time = getCurrentTime();
@@ -932,4 +953,35 @@
         function unlockPlayback() {
             document.getElementById('syncOverlay').classList.add('hidden');
             playVideo();
-            if(conn && conn.open) conn.send({ type: '
+            if(conn && conn.open) conn.send({ type: 'REQUEST_FULL_STATE' });
+        }
+
+        function showTheaterView(isHostRole) {
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('dashboardScreen').classList.add('hidden');
+            document.getElementById('theaterScreen').classList.remove('hidden');
+            const badge = document.getElementById('roleBadge');
+            badge.innerText = isHostRole ? "Host" : "Guest";
+            badge.className = isHostRole 
+                ? "text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                : "text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30";
+        }
+
+        function copyFullLink() {
+            if(currentRoomId && currentVideoSource) {
+                const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}&v=${encodeURIComponent(currentVideoSource)}`;
+                navigator.clipboard.writeText(url).then(() => alert("Invite Link copied to clipboard!"));
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const rKey = params.get('room');
+            const vParam = params.get('v');
+            if(rKey) {
+                joinAsGuest(rKey, vParam);
+            }
+        });
+    </script>
+</body>
+</html>
