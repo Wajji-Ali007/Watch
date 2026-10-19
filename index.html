@@ -1,40 +1,41 @@
 <!DOCTYPE html>
-<html lang="ur">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Together - ہم قدم مووی پارٹی</title>
+    <title>WatchTogether - Real-Time Video Party</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PeerJS for Real-time Sync without backend -->
+    <!-- PeerJS -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <!-- FontAwesome Icons -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-gray-950 text-white min-h-screen flex flex-col font-sans">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
 
-    <!-- Header -->
-    <header class="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/50 backdrop-blur">
-        <h1 class="text-2xl font-black text-rose-500 tracking-wider flex items-center gap-2">
-            <i class="fa-solid fa-film"></i> WatchTogether
-        </h1>
-        <div id="connectionStatus" class="text-xs px-3 py-1 rounded-full bg-gray-800 text-gray-400">
-            Offline
+    <!-- Navbar -->
+    <header class="p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-clapperboard text-indigo-500 text-xl"></i>
+            <span class="text-xl font-bold tracking-tight text-white">Watch<span class="text-indigo-500">Together</span></span>
+        </div>
+        <div id="statusBadge" class="text-xs font-medium px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-slate-500"></span> Ready
         </div>
     </header>
 
     <!-- Main Container -->
-    <main class="flex-1 flex flex-col items-center justify-center p-4">
+    <main class="flex-1 flex flex-col items-center justify-center p-4 w-full">
         
-        <!-- Setup Screen (Create / Join) -->
-        <div id="setupScreen" class="w-full max-w-md bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-2xl space-y-6">
+        <!-- Setup Screen -->
+        <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
             
-            <!-- Tabs -->
-            <div class="flex border-b border-gray-800">
-                <button id="tabCreateBtn" onclick="switchTab('create')" class="flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500">
+            <!-- Navigation Tabs -->
+            <div class="flex border-b border-slate-800">
+                <button id="tabCreateBtn" onclick="switchTab('create')" class="flex-1 pb-3 font-semibold text-indigo-400 border-b-2 border-indigo-500 transition">
                     Create Room
                 </button>
-                <button id="tabJoinBtn" onclick="switchTab('join')" class="flex-1 pb-3 font-semibold text-gray-400 border-b-2 border-transparent">
+                <button id="tabJoinBtn" onclick="switchTab('join')" class="flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition">
                     Join Room
                 </button>
             </div>
@@ -42,59 +43,65 @@
             <!-- Create Room Section -->
             <div id="createSection" class="space-y-4">
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">YouTube یا Direct Video (.mp4) لنک ڈالیں:</label>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Video URL (YouTube or Direct MP4):</label>
                     <input type="text" id="videoLinkInput" placeholder="https://www.youtube.com/watch?v=..." 
-                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                           class="w-full p-3 rounded-lg bg-slate-800/80 border border-slate-700 text-sm focus:outline-none focus:border-indigo-500 text-white placeholder-slate-500">
                 </div>
-                <button onclick="handleCreateRoom()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 font-bold rounded-lg transition shadow-lg shadow-rose-600/30">
-                    <i class="fa-solid fa-plus-circle mr-1"></i> Create Room & Copy Link
+                <button id="createRoomBtn" onclick="handleCreateRoom()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 font-bold rounded-lg transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i> Create Room
                 </button>
             </div>
 
             <!-- Join Room Section -->
             <div id="joinSection" class="space-y-4 hidden">
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">Room Code درج کریں:</label>
-                    <input type="text" id="roomCodeInput" placeholder="Room Code paste karein" 
-                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-sm focus:outline-none focus:border-rose-500 text-white">
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Room Key:</label>
+                    <input type="text" id="roomCodeInput" placeholder="Paste Room Key here..." 
+                           class="w-full p-3 rounded-lg bg-slate-800/80 border border-slate-700 text-sm focus:outline-none focus:border-indigo-500 text-white placeholder-slate-500">
                 </div>
-                <button onclick="handleManualJoin()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 font-bold rounded-lg transition shadow-lg shadow-blue-600/30">
-                    <i class="fa-solid fa-right-to-bracket mr-1"></i> Join Room
+                <button id="joinRoomBtn" onclick="handleManualJoin()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 font-bold rounded-lg transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Join Room
                 </button>
             </div>
 
-            <!-- Copied Notice -->
-            <div id="copyAlert" class="hidden p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs text-center">
-                <i class="fa-solid fa-check-circle mr-1"></i> لنک کاپی ہو چکا ہے! اپنے دوست کو بھیجیں۔
-            </div>
+            <!-- Toast / Copy Alert -->
+            <div id="alertMsg" class="hidden p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs text-center font-medium"></div>
 
         </div>
 
-        <!-- Theater / Video Player Screen (Hidden initially) -->
+        <!-- Watch Theater Screen -->
         <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-4">
             
-            <!-- Controls bar -->
-            <div class="w-full flex justify-between items-center bg-gray-900 p-3 rounded-xl border border-gray-800 text-sm">
-                <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span id="roleBadge" class="text-xs font-semibold px-2 py-0.5 rounded bg-gray-800 text-gray-300">Host</span>
-                    <span id="roomCodeDisplay" class="text-xs text-gray-400"></span>
+            <!-- Room Info & Copy Controls -->
+            <div class="w-full bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+                <div class="flex items-center gap-3">
+                    <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">Host</span>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wider text-slate-400">Room Key</div>
+                        <div id="displayKey" class="text-sm font-mono font-bold text-slate-200 select-all">Generating...</div>
+                    </div>
                 </div>
-                <button onclick="copyCurrentLink()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-xs rounded border border-gray-700">
-                    <i class="fa-regular fa-copy"></i> Copy Link
-                </button>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="copyRoomKey()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+                        <i class="fa-regular fa-copy"></i> Copy Key
+                    </button>
+                    <button onclick="copyFullLink()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition shadow-sm">
+                        <i class="fa-solid fa-link"></i> Copy Invite Link
+                    </button>
+                </div>
             </div>
 
-            <!-- Video Box -->
-            <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-gray-800 flex items-center justify-center">
-                <!-- YouTube Player -->
+            <!-- Video Player -->
+            <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
+                <!-- YouTube Container -->
                 <div id="ytPlayer" class="w-full h-full"></div>
                 <!-- Native Video Tag -->
                 <video id="nativePlayer" class="w-full h-full hidden" controls playsinline></video>
             </div>
-            
-            <p class="text-xs text-gray-500 text-center">
-                ⚠️ نوٹ: ایک شخص ویڈیو پلے یا پاز کرے گا تو دوسرے کی ویڈیو خود سنک ہو جائے گی۔
+
+            <p class="text-xs text-slate-500 text-center">
+                Playback controls (Play, Pause, Seek) are synchronized in real time.
             </p>
         </div>
 
@@ -107,17 +114,13 @@
         let peer = null;
         let conn = null;
         let isHost = false;
-        let ytPlayer = null;
-        let ytReady = false;
+        let currentRoomId = null;
+        let currentVideoSource = null;
         let currentVideoType = 'youtube'; // 'youtube' or 'native'
-        let isInternalAction = false; // loops roknay k liye
+        let ytPlayer = null;
+        let isInternalSync = false;
 
-        // Check if YouTube API loaded
-        function onYouTubeIframeAPIReady() {
-            ytReady = true;
-        }
-
-        // Tab Switching
+        // UI Tabs
         function switchTab(type) {
             const createSec = document.getElementById('createSection');
             const joinSec = document.getElementById('joinSection');
@@ -127,107 +130,184 @@
             if(type === 'create') {
                 createSec.classList.remove('hidden');
                 joinSec.classList.add('hidden');
-                createBtn.className = "flex-1 pb-3 font-semibold text-rose-500 border-b-2 border-rose-500";
-                joinBtn.className = "flex-1 pb-3 font-semibold text-gray-400 border-b-2 border-transparent";
+                createBtn.className = "flex-1 pb-3 font-semibold text-indigo-400 border-b-2 border-indigo-500 transition";
+                joinBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
             } else {
                 joinSec.classList.remove('hidden');
                 createSec.classList.add('hidden');
-                joinBtn.className = "flex-1 pb-3 font-semibold text-blue-500 border-b-2 border-blue-500";
-                createBtn.className = "flex-1 pb-3 font-semibold text-gray-400 border-b-2 border-transparent";
+                joinBtn.className = "flex-1 pb-3 font-semibold text-emerald-400 border-b-2 border-emerald-500 transition";
+                createBtn.className = "flex-1 pb-3 font-semibold text-slate-400 border-b-2 border-transparent transition";
             }
         }
 
-        // Helper: Extract YouTube ID
+        // Bulletproof Copy Mechanism (Works everywhere: HTTPS, HTTP, and Mobile)
+        function safeCopy(text, successMessage) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => showAlert(successMessage));
+            } else {
+                const tempInput = document.createElement("input");
+                tempInput.value = text;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                try {
+                    document.execCommand('copy');
+                    showAlert(successMessage);
+                } catch (err) {
+                    alert("Copy manually: " + text);
+                }
+                document.body.removeChild(tempInput);
+            }
+        }
+
+        function showAlert(msg) {
+            const alertBox = document.getElementById('alertMsg');
+            alertBox.innerText = msg;
+            alertBox.classList.remove('hidden');
+            setTimeout(() => alertBox.classList.add('hidden'), 3500);
+        }
+
+        function updateStatus(text, status) {
+            const badge = document.getElementById('statusBadge');
+            const color = status === 'connected' ? 'bg-emerald-500' : (status === 'connecting' ? 'bg-amber-500' : 'bg-slate-500');
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full ${color} ${status === 'connected' ? 'animate-pulse' : ''}"></span> ${text}`;
+        }
+
         function getYouTubeId(url) {
+            if(!url) return null;
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
         // Initialize Peer
-        function initPeer(customId = null) {
-            return new Promise((resolve) => {
-                peer = customId ? new Peer(customId) : new Peer();
-                peer.on('open', (id) => {
+        function createPeerConnection(desiredId = null) {
+            return new Promise((resolve, reject) => {
+                updateStatus("Connecting to server...", "connecting");
+                const p = desiredId ? new Peer(desiredId) : new Peer();
+                
+                p.on('open', (id) => {
+                    peer = p;
+                    currentRoomId = id;
+                    document.getElementById('displayKey').innerText = id;
+                    updateStatus("Ready / Waiting", "ready");
                     resolve(id);
                 });
-                peer.on('connection', (c) => {
-                    conn = c;
-                    setupDataListeners();
-                    updateStatus("Connected with Partner", true);
+
+                p.on('error', (err) => {
+                    console.error("Peer error:", err);
+                    updateStatus("Connection Error", "error");
+                    alert("Connection error: " + err.type);
+                    reject(err);
                 });
             });
         }
 
-        // Host creates room
+        // Host Creates Room
         async function handleCreateRoom() {
             const link = document.getElementById('videoLinkInput').value.trim();
-            if(!link) return alert("براہ کرم ویڈیو کا لنک درج کریں!");
+            if(!link) return alert("Please enter a valid video link!");
+
+            document.getElementById('createRoomBtn').disabled = true;
+            document.getElementById('createRoomBtn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
 
             isHost = true;
-            const myId = await initPeer();
-            
-            // Build shareable link
-            const fullUrl = `${window.location.origin}${window.location.pathname}?room=${myId}&v=${encodeURIComponent(link)}`;
-            
-            // Auto copy
-            navigator.clipboard.writeText(fullUrl).then(() => {
-                document.getElementById('copyAlert').classList.remove('hidden');
+            currentVideoSource = link;
+            const roomId = await createPeerConnection();
+
+            // Listen for guests joining
+            peer.on('connection', (c) => {
+                conn = c;
+                attachConnectionEvents();
+                updateStatus("Guest Connected", "connected");
+
+                // Immediately send video info to guest when they connect
+                conn.on('open', () => {
+                    conn.send({
+                        type: 'INIT',
+                        videoUrl: currentVideoSource,
+                        currentTime: getCurrentTime()
+                    });
+                });
             });
 
-            // Start Theater
-            loadVideo(link);
-            showTheater(myId, true);
+            // Auto copy full invite link
+            const fullUrl = buildInviteLink(roomId);
+            safeCopy(fullUrl, "Room created! Invite link copied to clipboard.");
+
+            // Launch Player
+            initPlayer(link);
+            showTheaterView(true);
         }
 
-        // Manual Join
-        function handleManualJoin() {
-            const code = document.getElementById('roomCodeInput').value.trim();
-            if(!code) return alert("Room Code درج کریں!");
-            joinRoom(code);
+        // Guest Joins Room Manually
+        async function handleManualJoin() {
+            let key = document.getElementById('roomCodeInput').value.trim();
+            if(!key) return alert("Please enter the Room Key!");
+
+            // If user pasted full URL instead of key, extract the key
+            if (key.includes('room=')) {
+                const urlParams = new URLSearchParams(key.split('?')[1]);
+                key = urlParams.get('room') || key;
+            }
+
+            document.getElementById('joinRoomBtn').disabled = true;
+            document.getElementById('joinRoomBtn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Joining...';
+
+            await joinTargetRoom(key);
         }
 
-        // Join Room by ID
-        async function joinRoom(targetPeerId, videoUrl = null) {
+        // Connect to Target Room
+        async function joinTargetRoom(targetKey) {
             isHost = false;
-            await initPeer();
-            conn = peer.connect(targetPeerId);
+            await createPeerConnection();
+            currentRoomId = targetKey;
+            document.getElementById('displayKey').innerText = targetKey;
+
+            updateStatus("Connecting to Host...", "connecting");
+            conn = peer.connect(targetKey, { reliable: true });
 
             conn.on('open', () => {
-                updateStatus("Connected to Host", true);
-                // Host se video link mangna agar URL me na ho
-                if(videoUrl) {
-                    loadVideo(decodeURIComponent(videoUrl));
-                    showTheater(targetPeerId, false);
-                }
+                updateStatus("Connected to Host", "connected");
             });
 
-            setupDataListeners();
+            attachConnectionEvents();
+            showTheaterView(false);
         }
 
-        // Setup Data Events
-        function setupDataListeners() {
+        // Listen for Real-Time Sync Commands
+        function attachConnectionEvents() {
             conn.on('data', (data) => {
-                isInternalAction = true;
-                if(data.action === 'play') {
-                    playVideo();
-                } else if(data.action === 'pause') {
-                    pauseVideo();
-                } else if(data.action === 'seek') {
-                    seekVideo(data.time);
+                isInternalSync = true;
+                if(data.type === 'INIT') {
+                    currentVideoSource = data.videoUrl;
+                    initPlayer(data.videoUrl, () => {
+                        seekPlayer(data.currentTime || 0);
+                    });
+                } else if(data.type === 'PLAY') {
+                    seekPlayer(data.time);
+                    playPlayer();
+                } else if(data.type === 'PAUSE') {
+                    seekPlayer(data.time);
+                    pausePlayer();
+                } else if(data.type === 'SEEK') {
+                    seekPlayer(data.time);
                 }
-                setTimeout(() => { isInternalAction = false; }, 500);
+                setTimeout(() => { isInternalSync = false; }, 800);
+            });
+
+            conn.on('close', () => {
+                updateStatus("Partner Disconnected", "error");
             });
         }
 
-        function sendSignal(action, time = 0) {
-            if(conn && conn.open && !isInternalAction) {
-                conn.send({ action, time });
+        function broadcast(action, time = 0) {
+            if(conn && conn.open && !isInternalSync) {
+                conn.send({ type: action, time: time });
             }
         }
 
         // Video Player Handling
-        function loadVideo(url) {
+        function initPlayer(url, onReadyCallback) {
             const ytId = getYouTubeId(url);
             const nativeVideo = document.getElementById('nativePlayer');
             const ytDiv = document.getElementById('ytPlayer');
@@ -237,16 +317,26 @@
                 nativeVideo.classList.add('hidden');
                 ytDiv.classList.remove('hidden');
 
-                if(ytPlayer) {
-                    ytPlayer.loadVideoById(ytId);
+                const createYt = () => {
+                    if (ytPlayer) {
+                        ytPlayer.loadVideoById(ytId);
+                        if(onReadyCallback) onReadyCallback();
+                    } else {
+                        ytPlayer = new YT.Player('ytPlayer', {
+                            videoId: ytId,
+                            playerVars: { 'autoplay': 0, 'controls': 1, 'playsinline': 1 },
+                            events: {
+                                'onReady': () => { if(onReadyCallback) onReadyCallback(); },
+                                'onStateChange': onYouTubeStateChange
+                            }
+                        });
+                    }
+                };
+
+                if (window.YT && window.YT.Player) {
+                    createYt();
                 } else {
-                    ytPlayer = new YT.Player('ytPlayer', {
-                        videoId: ytId,
-                        playerVars: { 'autoplay': 0, 'controls': 1 },
-                        events: {
-                            'onStateChange': onPlayerStateChange
-                        }
-                    });
+                    window.onYouTubeIframeAPIReady = createYt;
                 }
             } else {
                 currentVideoType = 'native';
@@ -254,23 +344,31 @@
                 nativeVideo.classList.remove('hidden');
                 nativeVideo.src = url;
 
-                nativeVideo.onplay = () => sendSignal('play');
-                nativeVideo.onpause = () => sendSignal('pause');
-                nativeVideo.onseeked = () => sendSignal('seek', nativeVideo.currentTime);
+                nativeVideo.onplay = () => {
+                    if(!isInternalSync) broadcast('PLAY', nativeVideo.currentTime);
+                };
+                nativeVideo.onpause = () => {
+                    if(!isInternalSync) broadcast('PAUSE', nativeVideo.currentTime);
+                };
+                nativeVideo.onseeked = () => {
+                    if(!isInternalSync) broadcast('SEEK', nativeVideo.currentTime);
+                };
+
+                if(onReadyCallback) onReadyCallback();
             }
         }
 
-        function onPlayerStateChange(event) {
-            if (isInternalAction) return;
+        function onYouTubeStateChange(event) {
+            if (isInternalSync) return;
+            const time = ytPlayer.getCurrentTime();
             if (event.data === YT.PlayerState.PLAYING) {
-                sendSignal('play');
+                broadcast('PLAY', time);
             } else if (event.data === YT.PlayerState.PAUSED) {
-                sendSignal('pause');
-                sendSignal('seek', ytPlayer.getCurrentTime());
+                broadcast('PAUSE', time);
             }
         }
 
-        function playVideo() {
+        function playPlayer() {
             if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.playVideo) {
                 ytPlayer.playVideo();
             } else {
@@ -278,7 +376,7 @@
             }
         }
 
-        function pauseVideo() {
+        function pausePlayer() {
             if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.pauseVideo) {
                 ytPlayer.pauseVideo();
             } else {
@@ -286,51 +384,53 @@
             }
         }
 
-        function seekVideo(time) {
+        function seekPlayer(seconds) {
             if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.seekTo) {
-                ytPlayer.seekTo(time, true);
+                ytPlayer.seekTo(seconds, true);
             } else {
-                document.getElementById('nativePlayer').currentTime = time;
+                document.getElementById('nativePlayer').currentTime = seconds;
             }
         }
 
-        function showTheater(code, hostStatus) {
+        function getCurrentTime() {
+            if(currentVideoType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) {
+                return ytPlayer.getCurrentTime();
+            }
+            return document.getElementById('nativePlayer').currentTime || 0;
+        }
+
+        function showTheaterView(isHostUser) {
             document.getElementById('setupScreen').classList.add('hidden');
             document.getElementById('theaterScreen').classList.remove('hidden');
-            document.getElementById('roleBadge').innerText = hostStatus ? "Host" : "Guest";
-            document.getElementById('roomCodeDisplay').innerText = `Room: ${code.substring(0, 8)}...`;
+            const badge = document.getElementById('roleBadge');
+            badge.innerText = isHostUser ? "Host" : "Guest";
+            badge.className = isHostUser 
+                ? "text-xs font-bold px-2.5 py-1 rounded-md bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                : "text-xs font-bold px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
         }
 
-        function updateStatus(text, isGood) {
-            const el = document.getElementById('connectionStatus');
-            el.innerText = text;
-            el.className = isGood ? "text-xs px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "text-xs px-3 py-1 rounded-full bg-gray-800 text-gray-400";
+        function buildInviteLink(key) {
+            return `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${key}`;
         }
 
-        function copyCurrentLink() {
-            navigator.clipboard.writeText(window.location.href);
-            alert("لنک کاپی ہو گیا!");
+        function copyRoomKey() {
+            if(currentRoomId) {
+                safeCopy(currentRoomId, "Room Key copied!");
+            }
         }
 
-        // On Page Load: Check if URL has ?room=
+        function copyFullLink() {
+            if(currentRoomId) {
+                safeCopy(buildInviteLink(currentRoomId), "Invite Link copied!");
+            }
+        }
+
+        // Auto-Join if URL has query parameter ?room=KEY
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
-            const roomId = params.get('room');
-            const videoSrc = params.get('v');
-
-            if(roomId) {
-                // Auto join guest
-                document.getElementById('setupScreen').classList.add('hidden');
-                document.getElementById('theaterScreen').classList.remove('hidden');
-                updateStatus("Connecting...", false);
-                
-                // YouTube API thora time leti hai initialize hone me
-                const timer = setInterval(() => {
-                    if(ytReady || videoSrc) {
-                        clearInterval(timer);
-                        joinRoom(roomId, videoSrc);
-                    }
-                }, 300);
+            const roomKey = params.get('room');
+            if(roomKey) {
+                joinTargetRoom(roomKey);
             }
         });
     </script>
