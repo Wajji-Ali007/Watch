@@ -15,8 +15,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
-        #chatMessages::-webkit-scrollbar, #friendsListContainer::-webkit-scrollbar { width: 4px; }
-        #chatMessages::-webkit-scrollbar-thumb, #friendsListContainer::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        #chatMessages::-webkit-scrollbar, #friendsListContainer::-webkit-scrollbar, #searchResultContainer::-webkit-scrollbar { width: 4px; }
+        #chatMessages::-webkit-scrollbar-thumb, #friendsListContainer::-webkit-scrollbar-thumb, #searchResultContainer::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
@@ -171,7 +171,7 @@
                         My Friends (<span id="myFriendsCount">0</span>)
                     </button>
                     <button id="tabFindFriendsBtn" onclick="switchFriendsTab('findFriends')" class="flex-1 text-xs font-bold text-slate-400 border-b-2 border-transparent pb-1.5 transition">
-                        <i class="fa-solid fa-magnifying-glass mr-1"></i> Find Friends
+                        <i class="fa-solid fa-user-plus mr-1"></i> Find Friends
                     </button>
                 </div>
 
@@ -183,25 +183,30 @@
                     </div>
                     <div id="friendsListContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
                         <div class="text-center text-xs text-slate-500 mt-16">
-                            You haven't followed any friends yet.<br>Click "Find Friends" to add them!
+                            You haven't followed any friends yet.<br>Click "Find Friends" to discover people!
                         </div>
                     </div>
                 </div>
 
-                <!-- TAB 2: FIND & FOLLOW FRIENDS -->
+                <!-- TAB 2: FIND & FOLLOW FRIENDS (Search + Auto All Users) -->
                 <div id="findFriendsSection" class="flex-1 flex flex-col overflow-hidden hidden space-y-3">
                     <div class="flex gap-2">
-                        <input type="text" id="searchFriendUsername" placeholder="Search by username..." 
+                        <input type="text" id="searchFriendUsername" onkeyup="handleSearchKeyUp(event)" placeholder="Search username, name, or email..." 
                                class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
                         <button onclick="handleSearchUser()" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1">
                             <i class="fa-solid fa-search"></i> Find
                         </button>
                     </div>
 
-                    <!-- Search Result Card Container -->
-                    <div id="searchResultContainer" class="flex-1 overflow-y-auto pr-1">
-                        <div class="text-center text-xs text-slate-500 mt-16">
-                            Enter a friend's username to search and follow them.
+                    <div class="text-[10px] text-slate-400 font-semibold px-1 flex justify-between items-center">
+                        <span>Available Users:</span>
+                        <button onclick="loadAllDiscoverUsers()" class="text-rose-400 hover:underline text-[10px]">Refresh</button>
+                    </div>
+
+                    <!-- Search / Discover Results List -->
+                    <div id="searchResultContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                        <div class="text-center text-xs text-slate-400 mt-10">
+                            <i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Loading users...
                         </div>
                     </div>
                 </div>
@@ -223,7 +228,6 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <!-- Dropdown for followed friends -->
                     <div class="relative">
                         <button onclick="toggleFriendInviteMenu()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm">
                             <i class="fa-solid fa-user-plus"></i> Invite Friends
@@ -334,6 +338,7 @@
         let invitesUnsubscribe = null;
         let activePendingInvite = null;
         let myFollowedFriendsList = [];
+        let allDiscoveredUsers = [];
 
         /*************************************************************
          * 2. AUTHENTICATION & PROFILES
@@ -388,6 +393,7 @@
                     showDashboard();
                     listenToFriends();
                     listenToIncomingInvites();
+                    loadAllDiscoverUsers();
                 } catch(e) {
                     console.error("User profile load error:", e);
                     showAuthScreen();
@@ -422,7 +428,7 @@
             e.preventDefault();
             const firstName = document.getElementById('signupFirstName').value.trim();
             const lastName = document.getElementById('signupLastName').value.trim();
-            const username = document.getElementById('signupUsername').value.trim().toLowerCase();
+            const username = document.getElementById('signupUsername').value.trim().toLowerCase().replace(/^@/, '');
             const email = document.getElementById('signupEmail').value.trim();
             const pass = document.getElementById('signupPassword').value.trim();
 
@@ -481,7 +487,7 @@
         }
 
         /*************************************************************
-         * 3. FRIENDS & SEARCH TABS SYSTEM
+         * 3. FRIENDS & SEARCH / AUTO-DISCOVER SYSTEM
          *************************************************************/
         function switchFriendsTab(tab) {
             const myFriendsSec = document.getElementById('myFriendsSection');
@@ -499,64 +505,133 @@
                 myFriendsSec.classList.add('hidden');
                 findFriendsBtn.className = "flex-1 text-xs font-bold text-rose-500 border-b-2 border-rose-500 pb-1.5 transition";
                 myFriendsBtn.className = "flex-1 text-xs font-bold text-slate-400 border-b-2 border-transparent pb-1.5 transition";
+                loadAllDiscoverUsers();
             }
         }
 
-        // Search user by username
+        // Auto load all registered users in the platform
+        async function loadAllDiscoverUsers() {
+            const container = document.getElementById('searchResultContainer');
+            if(!currentUserData) return;
+
+            try {
+                const snap = await db.collection('users').limit(25).get();
+                allDiscoveredUsers = [];
+                snap.forEach(d => {
+                    const u = d.data();
+                    if(u.uid !== currentUserData.uid) {
+                        allDiscoveredUsers.push(u);
+                    }
+                });
+                renderDiscoverList(allDiscoveredUsers);
+            } catch(e) {
+                console.error("Load users error:", e);
+                container.innerHTML = `<div class="text-center text-xs text-rose-400 mt-6">Failed to load users.</div>`;
+            }
+        }
+
+        function handleSearchKeyUp(e) {
+            if(e.key === 'Enter') handleSearchUser();
+            else {
+                // Live filter
+                const q = document.getElementById('searchFriendUsername').value.trim().toLowerCase().replace(/^@/, '');
+                if(!q) renderDiscoverList(allDiscoveredUsers);
+                else {
+                    const filtered = allDiscoveredUsers.filter(u => 
+                        (u.username && u.username.toLowerCase().includes(q)) ||
+                        (u.displayName && u.displayName.toLowerCase().includes(q)) ||
+                        (u.email && u.email.toLowerCase().includes(q))
+                    );
+                    renderDiscoverList(filtered);
+                }
+            }
+        }
+
         async function handleSearchUser() {
             const input = document.getElementById('searchFriendUsername');
-            const queryName = input.value.trim().toLowerCase();
+            let q = input.value.trim().toLowerCase().replace(/^@/, '');
             const container = document.getElementById('searchResultContainer');
 
-            if(!queryName) return;
-
-            if(queryName === currentUserData.username.toLowerCase()) {
-                container.innerHTML = `<div class="p-3 text-center text-xs text-amber-400 font-semibold bg-amber-500/10 rounded-xl border border-amber-500/20">That's your own username! Search for your friends.</div>`;
+            if(!q) {
+                renderDiscoverList(allDiscoveredUsers);
                 return;
             }
 
-            container.innerHTML = `<div class="text-center text-xs text-slate-400 mt-6"><i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Searching for @${queryName}...</div>`;
+            if(q === currentUserData.username.toLowerCase()) {
+                container.innerHTML = `<div class="p-3 text-center text-xs text-amber-400 font-semibold bg-amber-500/10 rounded-xl border border-amber-500/20">That's your own username! Search for other friends.</div>`;
+                return;
+            }
+
+            container.innerHTML = `<div class="text-center text-xs text-slate-400 mt-6"><i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Searching...</div>`;
 
             try {
-                const snap = await db.collection('users').where('username', '==', queryName).get();
+                // Search by username
+                let snap = await db.collection('users').where('username', '==', q).get();
+                
+                // If not found, try email
                 if(snap.empty) {
-                    container.innerHTML = `<div class="p-3 text-center text-xs text-rose-400 font-semibold bg-rose-500/10 rounded-xl border border-rose-500/20">No user found with username "@${queryName}"</div>`;
+                    snap = await db.collection('users').where('email', '==', q).get();
+                }
+
+                if(snap.empty) {
+                    container.innerHTML = `
+                        <div class="p-3 text-center text-xs text-rose-400 font-semibold bg-rose-500/10 rounded-xl border border-rose-500/20">
+                            No user found with "${q}".<br>
+                            <span class="text-[10px] text-slate-400">Make sure the friend has created an account first!</span>
+                        </div>
+                    `;
                     return;
                 }
 
-                const target = snap.docs[0].data();
-                const isAlreadyFriend = currentUserData.friends && currentUserData.friends.includes(target.uid);
-
-                const fullName = target.displayName || (target.firstName ? `${target.firstName} ${target.lastName || ''}`.trim() : target.username);
-
-                container.innerHTML = `
-                    <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between shadow-md">
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-9 h-9 rounded-full bg-rose-600/20 text-rose-400 font-bold flex items-center justify-center text-xs uppercase border border-rose-500/30">
-                                ${target.firstName ? target.firstName[0] : target.username[0]}
-                            </div>
-                            <div>
-                                <div class="text-xs font-bold text-white">${fullName}</div>
-                                <div class="text-[10px] text-slate-400 font-mono">@${target.username}</div>
-                            </div>
-                        </div>
-                        <div>
-                            ${isAlreadyFriend ? `
-                                <button onclick="handleUnfollowUser('${target.uid}')" class="px-3 py-1.5 bg-slate-700 hover:bg-rose-900/60 text-slate-200 hover:text-rose-300 text-xs font-bold rounded-lg transition">
-                                    Following <i class="fa-solid fa-check ml-1 text-emerald-400"></i>
-                                </button>
-                            ` : `
-                                <button onclick="handleFollowUser('${target.uid}')" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-md shadow-rose-600/30 flex items-center gap-1">
-                                    <i class="fa-solid fa-user-plus"></i> Follow
-                                </button>
-                            `}
-                        </div>
-                    </div>
-                `;
+                const list = [];
+                snap.forEach(d => {
+                    if(d.data().uid !== currentUserData.uid) list.push(d.data());
+                });
+                renderDiscoverList(list);
             } catch(e) {
                 console.error(e);
                 container.innerHTML = `<div class="text-center text-xs text-rose-400 mt-4">Error searching user.</div>`;
             }
+        }
+
+        function renderDiscoverList(users) {
+            const container = document.getElementById('searchResultContainer');
+            if(users.length === 0) {
+                container.innerHTML = `<div class="p-4 text-center text-xs text-slate-500">No other users found yet. Invite your friends to register!</div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            users.forEach(target => {
+                const isAlreadyFriend = currentUserData.friends && currentUserData.friends.includes(target.uid);
+                const fullName = target.displayName || (target.firstName ? `${target.firstName} ${target.lastName || ''}`.trim() : target.username);
+
+                const item = document.createElement('div');
+                item.className = "p-2.5 rounded-xl bg-slate-800 border border-slate-700/80 flex items-center justify-between shadow-md";
+                item.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-full bg-rose-600/20 text-rose-400 font-bold flex items-center justify-center text-xs uppercase border border-rose-500/30">
+                            ${(target.firstName || target.username || 'U')[0]}
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white">${fullName}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">@${target.username}</div>
+                        </div>
+                    </div>
+                    <div>
+                        ${isAlreadyFriend ? `
+                            <button onclick="handleUnfollowUser('${target.uid}')" class="px-3 py-1.5 bg-slate-700 hover:bg-rose-900/60 text-slate-200 hover:text-rose-300 text-xs font-bold rounded-lg transition">
+                                Following <i class="fa-solid fa-check ml-1 text-emerald-400"></i>
+                            </button>
+                        ` : `
+                            <button onclick="handleFollowUser('${target.uid}')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-md shadow-rose-600/30 flex items-center gap-1">
+                                <i class="fa-solid fa-user-plus"></i> Follow
+                            </button>
+                        `}
+                    </div>
+                `;
+                container.appendChild(item);
+            });
         }
 
         async function handleFollowUser(targetUid) {
@@ -566,7 +641,7 @@
                 });
                 currentUserData.friends = currentUserData.friends || [];
                 currentUserData.friends.push(targetUid);
-                handleSearchUser(); // refresh button state
+                renderDiscoverList(allDiscoveredUsers);
             } catch(e) {
                 console.error(e);
             }
@@ -579,7 +654,7 @@
                     friends: firebase.firestore.FieldValue.arrayRemove(targetUid)
                 });
                 currentUserData.friends = (currentUserData.friends || []).filter(id => id !== targetUid);
-                handleSearchUser();
+                renderDiscoverList(allDiscoveredUsers);
             } catch(e) {
                 console.error(e);
             }
