@@ -37,8 +37,8 @@
         <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
             
             <div class="text-center space-y-1">
-                <h2 class="text-lg font-black text-white">Create or Join a Room</h2>
-                <p class="text-xs text-slate-400">Watch movies together with up to 6 friends</p>
+                <h2 class="text-lg font-black text-white">Watch Party Room</h2>
+                <p class="text-xs text-slate-400">Watch with up to 6 friends in sync (No login needed)</p>
             </div>
 
             <!-- Nickname Input -->
@@ -48,7 +48,7 @@
                        class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white font-medium">
             </div>
 
-            <!-- Source Type Switcher (URL vs Local File) -->
+            <!-- Source Type Switcher -->
             <div class="space-y-3">
                 <div class="flex border-b border-slate-800">
                     <button id="tabUrlBtn" onclick="switchMediaTab('url')" class="flex-1 pb-2.5 font-bold text-xs text-rose-500 border-b-2 border-rose-500 transition">
@@ -90,8 +90,6 @@
                 </button>
             </div>
 
-            <div id="setupAlert" class="hidden p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center font-medium"></div>
-
         </div>
 
         <!-- 2. THEATER / WATCH PARTY SCREEN -->
@@ -121,11 +119,29 @@
             <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
                 <!-- YouTube Container -->
                 <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
-                <!-- Native / Stream Player -->
+                <!-- Native Video Tag -->
                 <video id="nativePlayer" class="w-full h-full hidden" playsinline></video>
 
+                <!-- Guest Prompt to select the same local file -->
+                <div id="guestFileSelectModal" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-30 hidden space-y-4">
+                    <div class="w-14 h-14 rounded-full bg-rose-600/20 text-rose-500 flex items-center justify-center text-2xl">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Host is watching a local video file:</h3>
+                        <p id="targetFileNameText" class="text-xs text-rose-400 font-mono mt-1 font-bold">video.mp4</p>
+                        <p class="text-[11px] text-slate-400 max-w-xs mt-2">
+                            Select this video from your phone storage to sync playback perfectly with zero buffering.
+                        </p>
+                    </div>
+                    <label class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl cursor-pointer transition shadow-lg shadow-rose-600/30">
+                        <i class="fa-solid fa-upload mr-1"></i> Select File from My Phone
+                        <input type="file" accept="video/*" class="hidden" onchange="handleGuestFileSelect(event)">
+                    </label>
+                </div>
+
                 <!-- Tap to Sync Overlay for Mobile -->
-                <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-30 hidden p-4 text-center">
+                <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-20 hidden p-4 text-center">
                     <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
                         <i class="fa-solid fa-play ml-1"></i>
                     </div>
@@ -193,25 +209,24 @@
         /*************************************************************
          * MULTI-PEER ENGINE (Up to 6 Persons, Zero-Backend)
          *************************************************************/
-        const MAX_PEERS = 5; // 1 Host + 5 Guests = 6 Persons Total
+        const MAX_PEERS = 5;
         let peer = null;
         let isHost = false;
         let myNickname = "Anonymous";
         let currentRoomId = null;
         
-        let guestConnections = []; // Host keeps list of connected guests
-        let hostConnection = null;  // Guest keeps connection to Host
+        let guestConnections = [];
+        let hostConnection = null;
 
-        let currentMediaType = 'youtube'; // 'youtube' | 'direct' | 'stream'
+        let currentMediaType = 'youtube'; // 'youtube' | 'direct' | 'local'
         let currentMediaSource = null;
-        let localVideoBlobUrl = null;
-        let localMediaStream = null;
+        let localSelectedFileName = null;
+        let localFileBlobUrl = null;
 
         let ytPlayer = null;
         let isInternalSync = false;
         let lastReportedTime = 0;
 
-        // Media Selector Tab
         function switchMediaTab(tab) {
             const urlContainer = document.getElementById('urlInputContainer');
             const fileContainer = document.getElementById('fileInputContainer');
@@ -234,8 +249,9 @@
         function handleFileSelect(e) {
             const file = e.target.files[0];
             if(file) {
+                localSelectedFileName = file.name;
                 document.getElementById('selectedFileName').innerText = `Selected: ${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)`;
-                localVideoBlobUrl = URL.createObjectURL(file);
+                localFileBlobUrl = URL.createObjectURL(file);
             }
         }
 
@@ -260,46 +276,39 @@
             });
         }
 
-        // Host creates party
+        // Host creates room
         async function handleCreateParty() {
             const nameInput = document.getElementById('userNickname').value.trim();
             myNickname = nameInput || "Host";
 
             const isFileMode = !document.getElementById('fileInputContainer').classList.contains('hidden');
-            let targetVideo = null;
 
             if(isFileMode) {
-                if(!localVideoBlobUrl) return alert("Please select a video file from your phone/computer!");
-                currentMediaType = 'stream';
-                targetVideo = 'stream';
+                if(!localFileBlobUrl) return alert("Please choose a video file from your phone/computer first!");
+                currentMediaType = 'local';
+                currentMediaSource = localSelectedFileName;
             } else {
                 const urlInput = document.getElementById('videoUrlInput').value.trim();
-                if(!urlInput) return alert("Please enter a video link!");
-                targetVideo = urlInput;
+                if(!urlInput) return alert("Please enter a video URL!");
+                currentMediaSource = urlInput;
                 currentMediaType = getYouTubeId(urlInput) ? 'youtube' : 'direct';
             }
 
             isHost = true;
-            currentMediaSource = targetVideo;
-
             await initPeerInstance();
             setupHostListeners();
 
-            // Load player locally
-            if(currentMediaType === 'stream') {
-                setupLocalFileStream(localVideoBlobUrl);
+            if(currentMediaType === 'local') {
+                setupNativePlayer(localFileBlobUrl);
             } else {
                 setupPlayer(currentMediaSource);
             }
 
             showTheaterScreen(true);
             updateMemberBadge(1);
-
-            // Auto copy share link
             copyFullLink();
         }
 
-        // Host Peer Listeners (Star topology for up to 6 people)
         function setupHostListeners() {
             peer.on('connection', (c) => {
                 if(guestConnections.length >= MAX_PEERS) {
@@ -314,21 +323,17 @@
                     guestConnections.push(c);
                     updateMemberBadge(guestConnections.length + 1);
 
-                    // Send current video & state to this new guest
+                    // Send current video & state to this guest
                     c.send({
                         type: 'INIT_STATE',
                         mediaType: currentMediaType,
-                        mediaSource: currentMediaType === 'stream' ? 'stream' : currentMediaSource,
+                        mediaSource: currentMediaSource,
+                        fileName: localSelectedFileName,
                         time: getCurrentTime(),
                         isPlaying: isPlayerPlaying(),
                         speed: getCurrentSpeed(),
-                        sender: 'Host'
+                        sender: myNickname
                     });
-
-                    // If local stream mode, initiate WebRTC Media Call
-                    if(currentMediaType === 'stream' && localMediaStream) {
-                        peer.call(c.peer, localMediaStream);
-                    }
 
                     broadcastSystemMessage(`${c.metadata?.name || 'A friend'} joined the room!`);
                 });
@@ -345,7 +350,7 @@
             });
         }
 
-        // Guest joins party
+        // Guest joins room
         async function handleManualJoin() {
             let key = document.getElementById('manualJoinCode').value.trim();
             if(!key) return alert("Please enter a Room Key or Link!");
@@ -368,22 +373,6 @@
 
             await initPeerInstance();
 
-            // Listen for incoming media stream call if host shares local file
-            peer.on('call', (call) => {
-                call.answer(); // Guest answers without sending stream
-                call.on('stream', (remoteStream) => {
-                    currentMediaType = 'stream';
-                    const nativeVideo = document.getElementById('nativePlayer');
-                    document.getElementById('ytPlayer').classList.add('hidden');
-                    nativeVideo.classList.remove('hidden');
-                    nativeVideo.srcObject = remoteStream;
-                    nativeVideo.play().catch(() => {
-                        document.getElementById('syncOverlay').classList.remove('hidden');
-                    });
-                });
-            });
-
-            // Connect data channel to Host
             hostConnection = peer.connect(targetRoomId, {
                 metadata: { name: myNickname },
                 reliable: true
@@ -403,7 +392,20 @@
             });
         }
 
-        // Handle Signals & Sync
+        function handleGuestFileSelect(e) {
+            const file = e.target.files[0];
+            if(file) {
+                document.getElementById('guestFileSelectModal').classList.add('hidden');
+                localFileBlobUrl = URL.createObjectURL(file);
+                setupNativePlayer(localFileBlobUrl, () => {
+                    // Ask host for current playback state
+                    if(hostConnection && hostConnection.open) {
+                        hostConnection.send({ type: 'REQUEST_SYNC' });
+                    }
+                });
+            }
+        }
+
         function handleIncomingSignal(data, senderConn) {
             if(data.type === 'ROOM_FULL') {
                 alert("This room is already full (Maximum 6 persons).");
@@ -413,10 +415,21 @@
 
             if(data.type === 'CHAT_MSG') {
                 appendChatMessage({ sender: data.sender, text: data.text, time: data.time, isMe: false });
-                if(isHost) {
-                    // Re-broadcast to all other guests
-                    forwardToOtherGuests(data, senderConn);
-                }
+                if(isHost) forwardToOtherGuests(data, senderConn);
+                return;
+            }
+
+            if(data.type === 'REQUEST_SYNC' && isHost) {
+                senderConn.send({
+                    type: 'INIT_STATE',
+                    mediaType: currentMediaType,
+                    mediaSource: currentMediaSource,
+                    fileName: localSelectedFileName,
+                    time: getCurrentTime(),
+                    isPlaying: isPlayerPlaying(),
+                    speed: getCurrentSpeed(),
+                    sender: myNickname
+                });
                 return;
             }
 
@@ -426,15 +439,16 @@
                 currentMediaType = data.mediaType;
                 currentMediaSource = data.mediaSource;
 
-                if(currentMediaType !== 'stream') {
+                if(currentMediaType === 'local') {
+                    document.getElementById('ytPlayer').classList.add('hidden');
+                    document.getElementById('nativePlayer').classList.remove('hidden');
+                    document.getElementById('targetFileNameText').innerText = data.fileName || "Video File";
+                    document.getElementById('guestFileSelectModal').classList.remove('hidden');
+                } else {
                     setupPlayer(data.mediaSource, () => {
                         seekToTime(data.time);
                         setPlaybackRate(data.speed || 1);
-                        if(data.isPlaying) {
-                            document.getElementById('syncOverlay').classList.remove('hidden');
-                        } else {
-                            pauseVideo();
-                        }
+                        if(data.isPlaying) playVideo(); else pauseVideo();
                     });
                 }
             } else if(data.type === 'PLAY') {
@@ -477,25 +491,30 @@
             }
         }
 
-        // Local Storage Video Stream Setup
-        function setupLocalFileStream(blobUrl) {
-            const nativeVideo = document.getElementById('nativePlayer');
+        function setupNativePlayer(srcUrl, callback) {
             document.getElementById('ytPlayer').classList.add('hidden');
-            nativeVideo.classList.remove('hidden');
-            nativeVideo.src = blobUrl;
+            const video = document.getElementById('nativePlayer');
+            video.classList.remove('hidden');
+            video.src = srcUrl;
 
-            nativeVideo.onloadedmetadata = () => {
-                try {
-                    localMediaStream = nativeVideo.captureStream ? nativeVideo.captureStream(30) : nativeVideo.mozCaptureStream(30);
-                } catch(e) {
-                    console.warn("CaptureStream error:", e);
-                }
+            video.onplay = () => {
+                updatePlayPauseButton(true);
+                broadcastToRoom({ type: 'PLAY', time: video.currentTime, sender: myNickname });
+            };
+            video.onpause = () => {
+                updatePlayPauseButton(false);
+                broadcastToRoom({ type: 'PAUSE', time: video.currentTime, sender: myNickname });
+            };
+            video.onseeked = () => {
+                broadcastToRoom({ type: 'SEEK', time: video.currentTime, sender: myNickname });
+            };
+            video.onratechange = () => {
+                broadcastToRoom({ type: 'RATE', rate: video.playbackRate, sender: myNickname });
             };
 
-            attachNativeEventListeners(nativeVideo);
+            if(callback) callback();
         }
 
-        // Player Core
         function setupPlayer(url, callback) {
             const ytId = getYouTubeId(url);
             const nativeVideo = document.getElementById('nativePlayer');
@@ -533,29 +552,8 @@
                 }
             } else {
                 currentMediaType = 'direct';
-                ytDiv.classList.add('hidden');
-                nativeVideo.classList.remove('hidden');
-                nativeVideo.src = url;
-                attachNativeEventListeners(nativeVideo);
-                if(callback) callback();
+                setupNativePlayer(url, callback);
             }
-        }
-
-        function attachNativeEventListeners(video) {
-            video.onplay = () => {
-                updatePlayPauseButton(true);
-                broadcastToRoom({ type: 'PLAY', time: video.currentTime, sender: myNickname });
-            };
-            video.onpause = () => {
-                updatePlayPauseButton(false);
-                broadcastToRoom({ type: 'PAUSE', time: video.currentTime, sender: myNickname });
-            };
-            video.onseeked = () => {
-                broadcastToRoom({ type: 'SEEK', time: video.currentTime, sender: myNickname });
-            };
-            video.onratechange = () => {
-                broadcastToRoom({ type: 'RATE', rate: video.playbackRate, sender: myNickname });
-            };
         }
 
         function onYouTubeStateChange(e) {
@@ -570,7 +568,6 @@
             }
         }
 
-        // Periodic seek check
         setInterval(() => {
             if(isInternalSync) return;
             const curTime = getCurrentTime();
@@ -580,7 +577,6 @@
             lastReportedTime = curTime;
         }, 500);
 
-        // Control Actions
         function userTogglePlay() {
             const playing = isPlayerPlaying();
             const time = getCurrentTime();
@@ -667,7 +663,7 @@
             playVideo();
         }
 
-        // Live Chat
+        // Live Chat Handlers
         function handleSendChat(e) {
             e.preventDefault();
             const input = document.getElementById('chatInput');
@@ -711,7 +707,6 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // UI & Screen Handlers
         function showTheaterScreen(isHostRole) {
             document.getElementById('setupScreen').classList.add('hidden');
             document.getElementById('theaterScreen').classList.remove('hidden');
@@ -743,7 +738,6 @@
             }
         }
 
-        // Auto join if ?room= query param is in URL
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const rKey = params.get('room');
