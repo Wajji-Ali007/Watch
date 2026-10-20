@@ -24,9 +24,16 @@
             <span class="text-xl font-black tracking-tight text-white">Watch<span class="text-rose-500">Room</span></span>
         </div>
         
-        <div id="roomMemberBadge" class="hidden flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 text-xs font-bold text-slate-300">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span id="memberCountText">👥 1/6 in Room</span>
+        <div class="flex items-center gap-2">
+            <!-- Connection Status Indicator -->
+            <div id="connStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                <span id="connStatusText">Connecting...</span>
+            </div>
+
+            <div id="roomMemberBadge" class="hidden flex items-center gap-1.5 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 text-xs font-bold text-slate-300">
+                <span id="memberCountText">👥 1/6</span>
+            </div>
         </div>
     </header>
 
@@ -38,7 +45,7 @@
             
             <div class="text-center space-y-1">
                 <h2 class="text-lg font-black text-white">Create a Watch Room</h2>
-                <p class="text-xs text-slate-400">Works across any Network & Mobile Data (Max 6)</p>
+                <p class="text-xs text-slate-400">Works across Office Wi-Fi, Mobile Data & Any Network</p>
             </div>
 
             <!-- Source Switcher -->
@@ -136,7 +143,8 @@
                     <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
                         <i class="fa-solid fa-play ml-1"></i>
                     </div>
-                    <h3 class="text-base font-bold text-white">Tap to Start Watching</h3>
+                    <h3 class="text-base font-bold text-white">Tap to Sync & Watch</h3>
+                    <p class="text-xs text-slate-400">Syncing with partner across network...</p>
                     <button onclick="unlockPlayback()" class="px-6 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs transition">
                         Watch Together
                     </button>
@@ -198,7 +206,7 @@
 
     <script>
         /*************************************************************
-         * 6-PERSON WATCH ROOM ENGINE (WITH GLOBAL STUN/TURN RELAYS)
+         * 6-PERSON WATCH ROOM ENGINE (ENTERPRISE TURN RELAY OVER TCP 443)
          *************************************************************/
         const MAX_PEERS = 5;
         let peer = null;
@@ -208,7 +216,7 @@
         let guestConnections = [];
         let hostConnection = null;
 
-        let currentMediaType = 'youtube'; // 'youtube' | 'direct' | 'local'
+        let currentMediaType = 'youtube';
         let currentMediaSource = null;
         let localSelectedFileName = null;
         let localFileBlobUrl = null;
@@ -217,19 +225,50 @@
         let isInternalSync = false;
         let lastReportedTime = 0;
 
-        // Global ICE / STUN Servers (Bypasses 4G/Wi-Fi CGNAT Firewalls)
+        // Enterprise ICE Configuration: Bypasses Office Firewalls & Mobile CGNAT
         const peerIceConfig = {
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' }
-                ]
+                    { urls: 'stun:openrelay.metered.ca:80' },
+                    // TURN over Port 80 & 443 TCP (Looks like standard HTTPS to office firewalls)
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                ],
+                iceTransportPolicy: 'all'
             }
         };
+
+        function updateConnStatus(text, status) {
+            const badge = document.getElementById('connStatusBadge');
+            const txt = document.getElementById('connStatusText');
+            txt.innerText = text;
+
+            if(status === 'connected') {
+                badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> <span>${text}</span>`;
+            } else if(status === 'connecting') {
+                badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> <span>${text}</span>`;
+            } else {
+                badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400"></span> <span>${text}</span>`;
+            }
+        }
 
         function switchMediaTab(tab) {
             const urlContainer = document.getElementById('urlInputContainer');
@@ -267,14 +306,17 @@
 
         function initPeerInstance() {
             return new Promise((resolve, reject) => {
+                updateConnStatus("Connecting Server...", "connecting");
                 peer = new Peer(peerIceConfig);
                 peer.on('open', (id) => {
                     currentRoomId = id;
                     document.getElementById('displayKey').innerText = id;
+                    updateConnStatus("Ready", "connected");
                     resolve(id);
                 });
                 peer.on('error', (err) => {
                     console.error("PeerJS Error:", err);
+                    updateConnStatus("Relay Error", "disconnected");
                     reject(err);
                 });
             });
@@ -323,8 +365,9 @@
                 c.on('open', () => {
                     guestConnections.push(c);
                     updateMemberBadge(guestConnections.length + 1);
+                    updateConnStatus(`Active (${guestConnections.length + 1}/6)`, "connected");
 
-                    // Send current video & state to the new guest
+                    // Send current state
                     c.send({
                         type: 'INIT_STATE',
                         mediaType: currentMediaType,
@@ -335,7 +378,7 @@
                         speed: getCurrentSpeed()
                     });
 
-                    broadcastSystemMessage("A friend joined the room!");
+                    broadcastSystemMessage("A friend connected across network!");
                 });
 
                 c.on('data', (data) => {
@@ -345,12 +388,12 @@
                 c.on('close', () => {
                     guestConnections = guestConnections.filter(g => g !== c);
                     updateMemberBadge(guestConnections.length + 1);
-                    broadcastSystemMessage("A friend left the room.");
+                    updateConnStatus(`Active (${guestConnections.length + 1}/6)`, "connected");
+                    broadcastSystemMessage("A friend disconnected.");
                 });
             });
         }
 
-        // Manual join button
         function handleManualJoin() {
             let key = document.getElementById('manualJoinCode').value.trim();
             if(!key) return alert("Please enter a Room Key or Link!");
@@ -367,15 +410,16 @@
             joinRoomDirectly(key, vUrl, vType, fName);
         }
 
-        // Guest joins directly from URL link (AUTOMATIC)
+        // Guest joins directly from URL link (AUTOMATIC & FIREWALL BYPASS)
         async function joinRoomDirectly(targetRoomId, videoUrl, videoType, fileName) {
             isHost = false;
             currentRoomId = targetRoomId;
             document.getElementById('displayKey').innerText = targetRoomId;
 
             showTheaterScreen(false);
+            updateConnStatus("Bypassing Firewall...", "connecting");
 
-            // Pre-load video from URL parameters immediately
+            // Pre-load video from URL parameters
             if(videoType === 'local') {
                 currentMediaType = 'local';
                 document.getElementById('ytPlayer').classList.add('hidden');
@@ -396,6 +440,7 @@
             });
 
             hostConnection.on('open', () => {
+                updateConnStatus("Synced with Host", "connected");
                 hostConnection.send({ type: 'REQUEST_SYNC' });
             });
 
@@ -404,6 +449,7 @@
             });
 
             hostConnection.on('close', () => {
+                updateConnStatus("Disconnected", "disconnected");
                 alert("Room closed or Host disconnected.");
                 leaveRoom();
             });
@@ -675,12 +721,17 @@
             return !!(nat.currentTime > 0 && !nat.paused && !nat.ended && nat.readyState > 2);
         }
 
+        // Tap to Sync Button Click
         function unlockPlayback() {
             document.getElementById('syncOverlay').classList.add('hidden');
             playVideo();
+            // Ask host for exact time immediately!
+            if(hostConnection && hostConnection.open) {
+                hostConnection.send({ type: 'REQUEST_SYNC' });
+            }
         }
 
-        // Live Chat Handlers
+        // Live Chat
         function handleSendChat(e) {
             e.preventDefault();
             const input = document.getElementById('chatInput');
@@ -762,7 +813,6 @@
             }
         }
 
-        // Auto join directly on link open
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const rKey = params.get('room');
