@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WatchTogether - 6-Person Movie Room</title>
+    <title>WatchTogether - 6-Person Watch Room</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -17,11 +17,11 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
 
-    <!-- Top Navigation Header -->
+    <!-- Header -->
     <header class="p-3 sm:p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex justify-between items-center sticky top-0 z-40">
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-film text-rose-500 text-xl"></i>
-            <span class="text-xl font-black tracking-tight text-white">Watch<span class="text-rose-500">Together</span></span>
+            <span class="text-xl font-black tracking-tight text-white">Watch<span class="text-rose-500">Room</span></span>
         </div>
         
         <div id="roomMemberBadge" class="hidden flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 text-xs font-bold text-slate-300">
@@ -37,53 +37,46 @@
         <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
             
             <div class="text-center space-y-1">
-                <h2 class="text-lg font-black text-white">Watch Room</h2>
-                <p class="text-xs text-slate-400">Watch with up to 6 friends in sync (No login needed)</p>
+                <h2 class="text-lg font-black text-white">Create a Watch Room</h2>
+                <p class="text-xs text-slate-400">Watch synchronized videos with up to 6 friends</p>
             </div>
 
-            <!-- Nickname Input -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1">Your Name / Nickname:</label>
-                <input type="text" id="userNickname" placeholder="e.g. Wajahat" 
-                       class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-rose-500 text-white font-medium">
-            </div>
-
-            <!-- Source Type Switcher -->
+            <!-- Source Switcher -->
             <div class="space-y-3">
                 <div class="flex border-b border-slate-800">
                     <button id="tabUrlBtn" onclick="switchMediaTab('url')" class="flex-1 pb-2.5 font-bold text-xs text-rose-500 border-b-2 border-rose-500 transition">
-                        <i class="fa-solid fa-link mr-1"></i> Web Link
+                        <i class="fa-solid fa-link mr-1"></i> Web Video Link
                     </button>
                     <button id="tabFileBtn" onclick="switchMediaTab('file')" class="flex-1 pb-2.5 font-bold text-xs text-slate-400 border-b-2 border-transparent transition">
                         <i class="fa-solid fa-file-video mr-1"></i> Phone File (.mp4)
                     </button>
                 </div>
 
-                <!-- Web Link Input Box -->
+                <!-- Web Link Input -->
                 <div id="urlInputContainer" class="space-y-1">
-                    <input type="text" id="videoUrlInput" placeholder="YouTube or direct MP4 URL..." 
-                           class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white">
+                    <input type="text" id="videoUrlInput" placeholder="Paste YouTube or direct video URL here..." 
+                           class="w-full p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
                 </div>
 
-                <!-- File Picker Input Box -->
+                <!-- Phone Storage File Input -->
                 <div id="fileInputContainer" class="hidden space-y-1">
                     <label class="block p-4 border-2 border-dashed border-slate-700 hover:border-rose-500 rounded-xl text-center cursor-pointer transition bg-slate-800/50">
                         <i class="fa-solid fa-cloud-arrow-up text-rose-500 text-2xl mb-1"></i>
                         <div id="selectedFileName" class="text-xs font-semibold text-slate-300">Tap to select video from storage</div>
-                        <div class="text-[10px] text-slate-500 mt-0.5">MP4, WebM, MKV supported</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">MP4, WebM, MKV</div>
                         <input type="file" id="localVideoFile" accept="video/*" class="hidden" onchange="handleFileSelect(event)">
                     </label>
                 </div>
             </div>
 
-            <!-- Action Buttons -->
-            <button id="createRoomBtn" onclick="handleCreateParty()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-sm transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 active:scale-95">
+            <!-- Create Room Button -->
+            <button id="createRoomBtn" onclick="handleCreateWatchRoom()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-sm transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 active:scale-95">
                 <i class="fa-solid fa-play"></i> Create Room & Copy Invite Link
             </button>
 
-            <!-- Manual Join Box -->
+            <!-- Manual Room Code Box -->
             <div class="pt-4 border-t border-slate-800 flex items-center gap-2">
-                <input type="text" id="manualJoinCode" placeholder="Paste Room Key or Link..." 
+                <input type="text" id="manualJoinCode" placeholder="Have a Room Code? Paste here..." 
                        class="flex-1 p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-white focus:outline-none focus:border-rose-500">
                 <button onclick="handleManualJoin()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-700 transition">
                     Join
@@ -92,10 +85,10 @@
 
         </div>
 
-        <!-- 2. THEATER / WATCH PARTY SCREEN -->
+        <!-- 2. WATCH ROOM THEATER SCREEN -->
         <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-3">
             
-            <!-- Room Controls & Members Bar -->
+            <!-- Controls Bar -->
             <div class="w-full bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-lg">
                 <div class="flex items-center gap-3">
                     <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">Host</span>
@@ -115,23 +108,21 @@
                 </div>
             </div>
 
-            <!-- Video Player Box -->
+            <!-- Video Player -->
             <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
-                <!-- YouTube Container -->
                 <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
-                <!-- Native Video Tag -->
                 <video id="nativePlayer" class="w-full h-full hidden" playsinline></video>
 
-                <!-- Guest Prompt to select the same local file -->
+                <!-- Guest Local File Select Prompt -->
                 <div id="guestFileSelectModal" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-30 hidden space-y-4">
                     <div class="w-14 h-14 rounded-full bg-rose-600/20 text-rose-500 flex items-center justify-center text-2xl">
                         <i class="fa-solid fa-folder-open"></i>
                     </div>
                     <div>
-                        <h3 class="text-sm font-bold text-white">Host is watching a local video file:</h3>
+                        <h3 class="text-sm font-bold text-white">Host is playing local video file:</h3>
                         <p id="targetFileNameText" class="text-xs text-rose-400 font-mono mt-1 font-bold">video.mp4</p>
                         <p class="text-[11px] text-slate-400 max-w-xs mt-2">
-                            Select this video from your phone storage to sync playback perfectly with zero buffering.
+                            Select this video from your phone storage to watch together in HD with zero lag.
                         </p>
                     </div>
                     <label class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl cursor-pointer transition shadow-lg shadow-rose-600/30">
@@ -140,19 +131,19 @@
                     </label>
                 </div>
 
-                <!-- Tap to Sync Overlay for Mobile -->
+                <!-- Mobile Autoplay Unlock Overlay -->
                 <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-20 hidden p-4 text-center">
                     <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
                         <i class="fa-solid fa-play ml-1"></i>
                     </div>
-                    <h3 class="text-base font-bold text-white">Tap to Sync & Watch</h3>
+                    <h3 class="text-base font-bold text-white">Tap to Start Watching</h3>
                     <button onclick="unlockPlayback()" class="px-6 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs transition">
-                        Start Video
+                        Watch Together
                     </button>
                 </div>
             </div>
 
-            <!-- Synced Quick Controls -->
+            <!-- Synchronized Quick Controls -->
             <div class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2 shadow-md">
                 <div class="flex items-center gap-2">
                     <button onclick="userSeekDelta(-10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95">
@@ -179,18 +170,18 @@
                 </div>
             </div>
 
-            <!-- Group Live Chat -->
+            <!-- Group Chat -->
             <div class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-72">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-comments text-rose-500 text-sm"></i>
-                        <span class="text-xs sm:text-sm font-bold text-white">Live Discussion (Up to 6 friends)</span>
+                        <span class="text-xs sm:text-sm font-bold text-white">Room Discussion (Up to 6 friends)</span>
                     </div>
-                    <span class="text-[10px] text-slate-500 font-medium">Real-Time Sync</span>
+                    <span class="text-[10px] text-slate-500 font-medium">Synced</span>
                 </div>
                 <div id="chatMessages" class="flex-1 overflow-y-auto space-y-2.5 pr-1"></div>
                 <form onsubmit="handleSendChat(event)" class="mt-3 flex gap-2">
-                    <input type="text" id="chatInput" placeholder="Comment on this scene..." autocomplete="off"
+                    <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off"
                            class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition">
                     <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-md shadow-rose-600/30">
                         <i class="fa-solid fa-paper-plane"></i>
@@ -207,14 +198,13 @@
 
     <script>
         /*************************************************************
-         * MULTI-PEER ENGINE (Up to 6 Persons, Zero-Backend)
+         * 6-PERSON REAL-TIME WATCH ROOM ENGINE
          *************************************************************/
-        const MAX_PEERS = 5;
+        const MAX_PEERS = 5; // 1 Host + 5 Guests = 6 Total
         let peer = null;
         let isHost = false;
-        let myNickname = "Anonymous";
         let currentRoomId = null;
-        
+
         let guestConnections = [];
         let hostConnection = null;
 
@@ -277,14 +267,11 @@
         }
 
         // Host creates room
-        async function handleCreateParty() {
-            const nameInput = document.getElementById('userNickname').value.trim();
-            myNickname = nameInput || "Host";
-
+        async function handleCreateWatchRoom() {
             const isFileMode = !document.getElementById('fileInputContainer').classList.contains('hidden');
 
             if(isFileMode) {
-                if(!localFileBlobUrl) return alert("Please choose a video file from your phone/computer first!");
+                if(!localFileBlobUrl) return alert("Please select a video file from your storage!");
                 currentMediaType = 'local';
                 currentMediaSource = localSelectedFileName;
             } else {
@@ -323,7 +310,7 @@
                     guestConnections.push(c);
                     updateMemberBadge(guestConnections.length + 1);
 
-                    // Send current video & state to this guest
+                    // Send current video & state to the new guest
                     c.send({
                         type: 'INIT_STATE',
                         mediaType: currentMediaType,
@@ -331,11 +318,10 @@
                         fileName: localSelectedFileName,
                         time: getCurrentTime(),
                         isPlaying: isPlayerPlaying(),
-                        speed: getCurrentSpeed(),
-                        sender: myNickname
+                        speed: getCurrentSpeed()
                     });
 
-                    broadcastSystemMessage(`${c.metadata?.name || 'A friend'} joined the room!`);
+                    broadcastSystemMessage("A friend joined the room!");
                 });
 
                 c.on('data', (data) => {
@@ -345,41 +331,57 @@
                 c.on('close', () => {
                     guestConnections = guestConnections.filter(g => g !== c);
                     updateMemberBadge(guestConnections.length + 1);
-                    broadcastSystemMessage(`${c.metadata?.name || 'A friend'} left the room.`);
+                    broadcastSystemMessage("A friend left the room.");
                 });
             });
         }
 
-        // Guest joins room
-        async function handleManualJoin() {
+        // Manual join button
+        function handleManualJoin() {
             let key = document.getElementById('manualJoinCode').value.trim();
             if(!key) return alert("Please enter a Room Key or Link!");
 
+            let vUrl = null, vType = null, fName = null;
             if(key.includes('?')) {
                 const params = new URLSearchParams(key.split('?')[1]);
+                vUrl = params.get('v');
+                vType = params.get('type');
+                fName = params.get('name');
                 key = params.get('room') || key;
             }
 
-            joinRoomAsGuest(key);
+            joinRoomDirectly(key, vUrl, vType, fName);
         }
 
-        async function joinRoomAsGuest(targetRoomId) {
-            const nameInput = document.getElementById('userNickname').value.trim();
-            myNickname = nameInput || "Guest";
-
+        // Guest joins directly from URL link (AUTOMATIC)
+        async function joinRoomDirectly(targetRoomId, videoUrl, videoType, fileName) {
             isHost = false;
             currentRoomId = targetRoomId;
             document.getElementById('displayKey').innerText = targetRoomId;
 
+            showTheaterScreen(false);
+
+            // Pre-load video from URL parameters immediately!
+            if(videoType === 'local') {
+                currentMediaType = 'local';
+                document.getElementById('ytPlayer').classList.add('hidden');
+                document.getElementById('nativePlayer').classList.remove('hidden');
+                document.getElementById('targetFileNameText').innerText = fileName ? decodeURIComponent(fileName) : "Video File";
+                document.getElementById('guestFileSelectModal').classList.remove('hidden');
+            } else if(videoUrl) {
+                currentMediaSource = decodeURIComponent(videoUrl);
+                currentMediaType = videoType || (getYouTubeId(currentMediaSource) ? 'youtube' : 'direct');
+                setupPlayer(currentMediaSource);
+                document.getElementById('syncOverlay').classList.remove('hidden');
+            }
+
             await initPeerInstance();
 
-            hostConnection = peer.connect(targetRoomId, {
-                metadata: { name: myNickname },
-                reliable: true
-            });
+            hostConnection = peer.connect(targetRoomId, { reliable: true });
 
             hostConnection.on('open', () => {
-                showTheaterScreen(false);
+                // Request sync state from host
+                hostConnection.send({ type: 'REQUEST_SYNC' });
             });
 
             hostConnection.on('data', (data) => {
@@ -398,7 +400,6 @@
                 document.getElementById('guestFileSelectModal').classList.add('hidden');
                 localFileBlobUrl = URL.createObjectURL(file);
                 setupNativePlayer(localFileBlobUrl, () => {
-                    // Ask host for current playback state
                     if(hostConnection && hostConnection.open) {
                         hostConnection.send({ type: 'REQUEST_SYNC' });
                     }
@@ -427,8 +428,7 @@
                     fileName: localSelectedFileName,
                     time: getCurrentTime(),
                     isPlaying: isPlayerPlaying(),
-                    speed: getCurrentSpeed(),
-                    sender: myNickname
+                    speed: getCurrentSpeed()
                 });
                 return;
             }
@@ -443,7 +443,9 @@
                     document.getElementById('ytPlayer').classList.add('hidden');
                     document.getElementById('nativePlayer').classList.remove('hidden');
                     document.getElementById('targetFileNameText').innerText = data.fileName || "Video File";
-                    document.getElementById('guestFileSelectModal').classList.remove('hidden');
+                    if(!localFileBlobUrl) {
+                        document.getElementById('guestFileSelectModal').classList.remove('hidden');
+                    }
                 } else {
                     setupPlayer(data.mediaSource, () => {
                         seekToTime(data.time);
@@ -499,17 +501,17 @@
 
             video.onplay = () => {
                 updatePlayPauseButton(true);
-                broadcastToRoom({ type: 'PLAY', time: video.currentTime, sender: myNickname });
+                broadcastToRoom({ type: 'PLAY', time: video.currentTime, sender: isHost ? 'Host' : 'Guest' });
             };
             video.onpause = () => {
                 updatePlayPauseButton(false);
-                broadcastToRoom({ type: 'PAUSE', time: video.currentTime, sender: myNickname });
+                broadcastToRoom({ type: 'PAUSE', time: video.currentTime, sender: isHost ? 'Host' : 'Guest' });
             };
             video.onseeked = () => {
-                broadcastToRoom({ type: 'SEEK', time: video.currentTime, sender: myNickname });
+                broadcastToRoom({ type: 'SEEK', time: video.currentTime, sender: isHost ? 'Host' : 'Guest' });
             };
             video.onratechange = () => {
-                broadcastToRoom({ type: 'RATE', rate: video.playbackRate, sender: myNickname });
+                broadcastToRoom({ type: 'RATE', rate: video.playbackRate, sender: isHost ? 'Host' : 'Guest' });
             };
 
             if(callback) callback();
@@ -561,10 +563,10 @@
             const time = ytPlayer.getCurrentTime();
             if(e.data === YT.PlayerState.PLAYING) {
                 updatePlayPauseButton(true);
-                broadcastToRoom({ type: 'PLAY', time: time, sender: myNickname });
+                broadcastToRoom({ type: 'PLAY', time: time, sender: isHost ? 'Host' : 'Guest' });
             } else if(e.data === YT.PlayerState.PAUSED) {
                 updatePlayPauseButton(false);
-                broadcastToRoom({ type: 'PAUSE', time: time, sender: myNickname });
+                broadcastToRoom({ type: 'PAUSE', time: time, sender: isHost ? 'Host' : 'Guest' });
             }
         }
 
@@ -572,7 +574,7 @@
             if(isInternalSync) return;
             const curTime = getCurrentTime();
             if(Math.abs(curTime - lastReportedTime) > 1.8 && isPlayerPlaying()) {
-                broadcastToRoom({ type: 'SEEK', time: curTime, sender: myNickname });
+                broadcastToRoom({ type: 'SEEK', time: curTime, sender: isHost ? 'Host' : 'Guest' });
             }
             lastReportedTime = curTime;
         }, 500);
@@ -582,23 +584,23 @@
             const time = getCurrentTime();
             if(playing) {
                 pauseVideo();
-                broadcastToRoom({ type: 'PAUSE', time, sender: myNickname });
+                broadcastToRoom({ type: 'PAUSE', time, sender: isHost ? 'Host' : 'Guest' });
             } else {
                 playVideo();
-                broadcastToRoom({ type: 'PLAY', time, sender: myNickname });
+                broadcastToRoom({ type: 'PLAY', time, sender: isHost ? 'Host' : 'Guest' });
             }
         }
 
         function userSeekDelta(delta) {
             const newTime = Math.max(0, getCurrentTime() + delta);
             seekToTime(newTime);
-            broadcastToRoom({ type: 'SEEK', time: newTime, sender: myNickname });
+            broadcastToRoom({ type: 'SEEK', time: newTime, sender: isHost ? 'Host' : 'Guest' });
         }
 
         function userChangeSpeed(val) {
             const rate = parseFloat(val);
             setPlaybackRate(rate);
-            broadcastToRoom({ type: 'RATE', rate, sender: myNickname });
+            broadcastToRoom({ type: 'RATE', rate, sender: isHost ? 'Host' : 'Guest' });
         }
 
         function updatePlayPauseButton(isPlaying) {
@@ -663,7 +665,7 @@
             playVideo();
         }
 
-        // Live Chat Handlers
+        // Live Chat
         function handleSendChat(e) {
             e.preventDefault();
             const input = document.getElementById('chatInput');
@@ -671,9 +673,10 @@
             if(!text) return;
 
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            appendChatMessage({ sender: myNickname, text, time: timeStr, isMe: true });
+            const senderRole = isHost ? 'Host' : 'Guest';
+            appendChatMessage({ sender: senderRole, text, time: timeStr, isMe: true });
 
-            broadcastToRoom({ type: 'CHAT_MSG', sender: myNickname, text, time: timeStr });
+            broadcastToRoom({ type: 'CHAT_MSG', sender: senderRole, text, time: timeStr });
             input.value = '';
         }
 
@@ -723,11 +726,18 @@
             document.getElementById('memberCountText').innerText = `👥 ${count}/6 in Room`;
         }
 
+        // FULL LINK GENERATION WITH EMBEDDED VIDEO INFO
         function copyFullLink() {
             if(currentRoomId) {
-                const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}`;
+                let url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}`;
+                if(currentMediaType !== 'local' && currentMediaSource) {
+                    url += `&v=${encodeURIComponent(currentMediaSource)}&type=${currentMediaType}`;
+                } else if(currentMediaType === 'local') {
+                    url += `&type=local&name=${encodeURIComponent(localSelectedFileName || 'video.mp4')}`;
+                }
+
                 navigator.clipboard.writeText(url).then(() => {
-                    alert("Invite link copied! Share it with up to 5 friends.");
+                    alert("Watch Room link copied! Share with up to 5 friends.");
                 });
             }
         }
@@ -738,11 +748,16 @@
             }
         }
 
+        // AUTO-JOIN DIRECTLY ON LINK OPEN
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const rKey = params.get('room');
+            const vUrl = params.get('v');
+            const vType = params.get('type');
+            const fName = params.get('name');
+
             if(rKey) {
-                document.getElementById('manualJoinCode').value = rKey;
+                joinRoomDirectly(rKey, vUrl, vType, fName);
             }
         });
     </script>
