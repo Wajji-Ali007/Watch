@@ -8,8 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PeerJS -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Firebase App & Firestore (No Auth, No Login, Direct Google Channel) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
         #chatMessages::-webkit-scrollbar { width: 4px; }
         #chatMessages::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -25,14 +26,9 @@
         </div>
         
         <div class="flex items-center gap-2">
-            <!-- Connection Status Indicator -->
-            <div id="connStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-                <span id="connStatusText">Connecting...</span>
-            </div>
-
-            <div id="roomMemberBadge" class="hidden flex items-center gap-1.5 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 text-xs font-bold text-slate-300">
-                <span id="memberCountText">👥 1/6</span>
+            <div id="connStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Active</span>
             </div>
         </div>
     </header>
@@ -101,13 +97,13 @@
                     <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">Host</span>
                     <div>
                         <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Room Code</div>
-                        <div id="displayKey" class="text-xs font-mono font-bold text-slate-200">Connecting...</div>
+                        <div id="displayKey" class="text-xs font-mono font-bold text-slate-200">Generating...</div>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-2">
                     <button onclick="copyFullLink()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm active:scale-95">
-                        <i class="fa-solid fa-share-nodes"></i> Share Link (Max 6)
+                        <i class="fa-solid fa-share-nodes"></i> Share Link
                     </button>
                     <button onclick="leaveRoom()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 transition">
                         Exit
@@ -143,8 +139,7 @@
                     <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
                         <i class="fa-solid fa-play ml-1"></i>
                     </div>
-                    <h3 class="text-base font-bold text-white">Tap to Sync & Watch</h3>
-                    <p class="text-xs text-slate-400">Syncing with partner across network...</p>
+                    <h3 class="text-base font-bold text-white">Tap to Start Watching</h3>
                     <button onclick="unlockPlayback()" class="px-6 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs transition">
                         Watch Together
                     </button>
@@ -183,7 +178,7 @@
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-comments text-rose-500 text-sm"></i>
-                        <span class="text-xs sm:text-sm font-bold text-white">Room Discussion (Up to 6 friends)</span>
+                        <span class="text-xs sm:text-sm font-bold text-white">Room Discussion</span>
                     </div>
                     <span class="text-[10px] text-slate-500 font-medium">Synced</span>
                 </div>
@@ -206,15 +201,25 @@
 
     <script>
         /*************************************************************
-         * 6-PERSON WATCH ROOM ENGINE (ENTERPRISE TURN RELAY OVER TCP 443)
+         * BULLETPROOF GOOGLE CHANNEL ENGINE (ZERO-LOGIN, UNBLOCKABLE)
          *************************************************************/
-        const MAX_PEERS = 5;
-        let peer = null;
+        const firebaseConfig = {
+            apiKey: "AIzaSyBnrkQAjPeetJWPcYhW4NK4d1SSM15bbEA",
+            authDomain: "mahveenwajahat.firebaseapp.com",
+            projectId: "mahveenwajahat",
+            storageBucket: "mahveenwajahat.firebasestorage.app",
+            messagingSenderId: "1068557622123",
+            appId: "1:1068557622123:web:dfe4300b304c0ab328ca2e",
+            measurementId: "G-Q1M5Z7CDQX"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Unique ID for this browser tab
+        const myClientId = 'user_' + Math.random().toString(36).substring(2, 9);
         let isHost = false;
         let currentRoomId = null;
-
-        let guestConnections = [];
-        let hostConnection = null;
 
         let currentMediaType = 'youtube';
         let currentMediaSource = null;
@@ -224,51 +229,8 @@
         let ytPlayer = null;
         let isInternalSync = false;
         let lastReportedTime = 0;
-
-        // Enterprise ICE Configuration: Bypasses Office Firewalls & Mobile CGNAT
-        const peerIceConfig = {
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:openrelay.metered.ca:80' },
-                    // TURN over Port 80 & 443 TCP (Looks like standard HTTPS to office firewalls)
-                    {
-                        urls: 'turn:openrelay.metered.ca:80',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turn:openrelay.metered.ca:443',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    }
-                ],
-                iceTransportPolicy: 'all'
-            }
-        };
-
-        function updateConnStatus(text, status) {
-            const badge = document.getElementById('connStatusBadge');
-            const txt = document.getElementById('connStatusText');
-            txt.innerText = text;
-
-            if(status === 'connected') {
-                badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> <span>${text}</span>`;
-            } else if(status === 'connecting') {
-                badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20";
-                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> <span>${text}</span>`;
-            } else {
-                badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20";
-                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400"></span> <span>${text}</span>`;
-            }
-        }
+        let roomUnsubscribe = null;
+        let chatUnsubscribe = null;
 
         function switchMediaTab(tab) {
             const urlContainer = document.getElementById('urlInputContainer');
@@ -304,24 +266,6 @@
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        function initPeerInstance() {
-            return new Promise((resolve, reject) => {
-                updateConnStatus("Connecting Server...", "connecting");
-                peer = new Peer(peerIceConfig);
-                peer.on('open', (id) => {
-                    currentRoomId = id;
-                    document.getElementById('displayKey').innerText = id;
-                    updateConnStatus("Ready", "connected");
-                    resolve(id);
-                });
-                peer.on('error', (err) => {
-                    console.error("PeerJS Error:", err);
-                    updateConnStatus("Relay Error", "disconnected");
-                    reject(err);
-                });
-            });
-        }
-
         // Host creates room
         async function handleCreateWatchRoom() {
             const isFileMode = !document.getElementById('fileInputContainer').classList.contains('hidden');
@@ -338,8 +282,24 @@
             }
 
             isHost = true;
-            await initPeerInstance();
-            setupHostListeners();
+            // Generate clean 6-digit room code
+            currentRoomId = 'RM-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+            document.getElementById('displayKey').innerText = currentRoomId;
+
+            // Save room state in Firestore
+            await db.collection('watchrooms').doc(currentRoomId).set({
+                mediaType: currentMediaType,
+                mediaSource: currentMediaSource,
+                fileName: localSelectedFileName || '',
+                currentTime: 0,
+                isPlaying: false,
+                speed: 1,
+                lastUpdatedBy: myClientId,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            listenToRoomUpdates(currentRoomId);
+            listenToChat(currentRoomId);
 
             if(currentMediaType === 'local') {
                 setupNativePlayer(localFileBlobUrl);
@@ -348,111 +308,107 @@
             }
 
             showTheaterScreen(true);
-            updateMemberBadge(1);
             copyFullLink();
-        }
-
-        function setupHostListeners() {
-            peer.on('connection', (c) => {
-                if(guestConnections.length >= MAX_PEERS) {
-                    c.on('open', () => {
-                        c.send({ type: 'ROOM_FULL' });
-                        c.close();
-                    });
-                    return;
-                }
-
-                c.on('open', () => {
-                    guestConnections.push(c);
-                    updateMemberBadge(guestConnections.length + 1);
-                    updateConnStatus(`Active (${guestConnections.length + 1}/6)`, "connected");
-
-                    // Send current state
-                    c.send({
-                        type: 'INIT_STATE',
-                        mediaType: currentMediaType,
-                        mediaSource: currentMediaSource,
-                        fileName: localSelectedFileName,
-                        time: getCurrentTime(),
-                        isPlaying: isPlayerPlaying(),
-                        speed: getCurrentSpeed()
-                    });
-
-                    broadcastSystemMessage("A friend connected across network!");
-                });
-
-                c.on('data', (data) => {
-                    handleIncomingSignal(data, c);
-                });
-
-                c.on('close', () => {
-                    guestConnections = guestConnections.filter(g => g !== c);
-                    updateMemberBadge(guestConnections.length + 1);
-                    updateConnStatus(`Active (${guestConnections.length + 1}/6)`, "connected");
-                    broadcastSystemMessage("A friend disconnected.");
-                });
-            });
         }
 
         function handleManualJoin() {
             let key = document.getElementById('manualJoinCode').value.trim();
-            if(!key) return alert("Please enter a Room Key or Link!");
+            if(!key) return alert("Please enter a Room Code or Link!");
 
-            let vUrl = null, vType = null, fName = null;
             if(key.includes('?')) {
                 const params = new URLSearchParams(key.split('?')[1]);
-                vUrl = params.get('v');
-                vType = params.get('type');
-                fName = params.get('name');
                 key = params.get('room') || key;
             }
 
-            joinRoomDirectly(key, vUrl, vType, fName);
+            joinRoomDirectly(key);
         }
 
-        // Guest joins directly from URL link (AUTOMATIC & FIREWALL BYPASS)
-        async function joinRoomDirectly(targetRoomId, videoUrl, videoType, fileName) {
+        // Guest joins directly from URL link
+        async function joinRoomDirectly(targetRoomId) {
             isHost = false;
             currentRoomId = targetRoomId;
             document.getElementById('displayKey').innerText = targetRoomId;
 
             showTheaterScreen(false);
-            updateConnStatus("Bypassing Firewall...", "connecting");
 
-            // Pre-load video from URL parameters
-            if(videoType === 'local') {
-                currentMediaType = 'local';
-                document.getElementById('ytPlayer').classList.add('hidden');
-                document.getElementById('nativePlayer').classList.remove('hidden');
-                document.getElementById('targetFileNameText').innerText = fileName ? decodeURIComponent(fileName) : "Video File";
-                document.getElementById('guestFileSelectModal').classList.remove('hidden');
-            } else if(videoUrl) {
-                currentMediaSource = decodeURIComponent(videoUrl);
-                currentMediaType = videoType || (getYouTubeId(currentMediaSource) ? 'youtube' : 'direct');
-                setupPlayer(currentMediaSource);
-                document.getElementById('syncOverlay').classList.remove('hidden');
+            // Fetch room state immediately
+            const doc = await db.collection('watchrooms').doc(targetRoomId).get();
+            if(!doc.exists) {
+                alert("Room not found or expired!");
+                leaveRoom();
+                return;
             }
 
-            await initPeerInstance();
+            const data = doc.data();
+            currentMediaType = data.mediaType;
+            currentMediaSource = data.mediaSource;
 
-            hostConnection = peer.connect(targetRoomId, { 
-                reliable: true 
-            });
+            if(currentMediaType === 'local') {
+                document.getElementById('ytPlayer').classList.add('hidden');
+                document.getElementById('nativePlayer').classList.remove('hidden');
+                document.getElementById('targetFileNameText').innerText = data.fileName || "Video File";
+                document.getElementById('guestFileSelectModal').classList.remove('hidden');
+            } else {
+                setupPlayer(data.mediaSource, () => {
+                    seekToTime(data.currentTime || 0);
+                    setPlaybackRate(data.speed || 1);
+                    if(data.isPlaying) {
+                        document.getElementById('syncOverlay').classList.remove('hidden');
+                    } else {
+                        pauseVideo();
+                    }
+                });
+            }
 
-            hostConnection.on('open', () => {
-                updateConnStatus("Synced with Host", "connected");
-                hostConnection.send({ type: 'REQUEST_SYNC' });
-            });
+            listenToRoomUpdates(targetRoomId);
+            listenToChat(targetRoomId);
+        }
 
-            hostConnection.on('data', (data) => {
-                handleIncomingSignal(data, hostConnection);
-            });
+        // Realtime Firestore Listener (Replaces PeerJS WebSockets!)
+        function listenToRoomUpdates(roomId) {
+            if(roomUnsubscribe) roomUnsubscribe();
+            
+            roomUnsubscribe = db.collection('watchrooms').doc(roomId).onSnapshot((doc) => {
+                if(!doc.exists) return;
+                const data = doc.data();
 
-            hostConnection.on('close', () => {
-                updateConnStatus("Disconnected", "disconnected");
-                alert("Room closed or Host disconnected.");
-                leaveRoom();
+                // If update was triggered by this device, ignore to avoid feedback loop
+                if(data.lastUpdatedBy === myClientId) return;
+
+                isInternalSync = true;
+
+                // Sync Play/Pause
+                if(data.isPlaying !== isPlayerPlaying()) {
+                    if(data.isPlaying) playVideo();
+                    else pauseVideo();
+                    updatePlayPauseButton(data.isPlaying);
+                }
+
+                // Sync Seek Time (if drifted by more than 1.5 seconds)
+                if(Math.abs(getCurrentTime() - data.currentTime) > 1.5) {
+                    seekToTime(data.currentTime);
+                }
+
+                // Sync Speed
+                if(data.speed && data.speed !== getCurrentSpeed()) {
+                    setPlaybackRate(data.speed);
+                }
+
+                setTimeout(() => { isInternalSync = false; }, 400);
             });
+        }
+
+        // Broadcast State to Firestore
+        function syncStateToCloud(changes = {}) {
+            if(isInternalSync || !currentRoomId) return;
+
+            db.collection('watchrooms').doc(currentRoomId).update({
+                currentTime: getCurrentTime(),
+                isPlaying: isPlayerPlaying(),
+                speed: getCurrentSpeed(),
+                lastUpdatedBy: myClientId,
+                ...changes
+            }).catch(e => console.error("Sync error:", e));
         }
 
         function handleGuestFileSelect(e) {
@@ -461,96 +417,8 @@
                 document.getElementById('guestFileSelectModal').classList.add('hidden');
                 localFileBlobUrl = URL.createObjectURL(file);
                 setupNativePlayer(localFileBlobUrl, () => {
-                    if(hostConnection && hostConnection.open) {
-                        hostConnection.send({ type: 'REQUEST_SYNC' });
-                    }
+                    document.getElementById('syncOverlay').classList.remove('hidden');
                 });
-            }
-        }
-
-        function handleIncomingSignal(data, senderConn) {
-            if(data.type === 'ROOM_FULL') {
-                alert("This room is already full (Maximum 6 persons).");
-                leaveRoom();
-                return;
-            }
-
-            if(data.type === 'CHAT_MSG') {
-                appendChatMessage({ sender: data.sender, text: data.text, time: data.time, isMe: false });
-                if(isHost) forwardToOtherGuests(data, senderConn);
-                return;
-            }
-
-            if(data.type === 'REQUEST_SYNC' && isHost) {
-                senderConn.send({
-                    type: 'INIT_STATE',
-                    mediaType: currentMediaType,
-                    mediaSource: currentMediaSource,
-                    fileName: localSelectedFileName,
-                    time: getCurrentTime(),
-                    isPlaying: isPlayerPlaying(),
-                    speed: getCurrentSpeed()
-                });
-                return;
-            }
-
-            isInternalSync = true;
-
-            if(data.type === 'INIT_STATE') {
-                currentMediaType = data.mediaType;
-                currentMediaSource = data.mediaSource;
-
-                if(currentMediaType === 'local') {
-                    document.getElementById('ytPlayer').classList.add('hidden');
-                    document.getElementById('nativePlayer').classList.remove('hidden');
-                    document.getElementById('targetFileNameText').innerText = data.fileName || "Video File";
-                    if(!localFileBlobUrl) {
-                        document.getElementById('guestFileSelectModal').classList.remove('hidden');
-                    }
-                } else {
-                    setupPlayer(data.mediaSource, () => {
-                        seekToTime(data.time);
-                        setPlaybackRate(data.speed || 1);
-                        if(data.isPlaying) playVideo(); else pauseVideo();
-                    });
-                }
-            } else if(data.type === 'PLAY') {
-                seekToTime(data.time);
-                playVideo();
-                updatePlayPauseButton(true);
-                if(isHost) forwardToOtherGuests(data, senderConn);
-            } else if(data.type === 'PAUSE') {
-                seekToTime(data.time);
-                pauseVideo();
-                updatePlayPauseButton(false);
-                if(isHost) forwardToOtherGuests(data, senderConn);
-            } else if(data.type === 'SEEK') {
-                seekToTime(data.time);
-                if(isHost) forwardToOtherGuests(data, senderConn);
-            } else if(data.type === 'RATE') {
-                setPlaybackRate(data.rate);
-                if(isHost) forwardToOtherGuests(data, senderConn);
-            }
-
-            setTimeout(() => { isInternalSync = false; }, 600);
-        }
-
-        function forwardToOtherGuests(payload, originConn) {
-            guestConnections.forEach(c => {
-                if(c !== originConn && c.open) {
-                    c.send(payload);
-                }
-            });
-        }
-
-        function broadcastToRoom(payload) {
-            if(isInternalSync) return;
-            if(isHost) {
-                guestConnections.forEach(c => {
-                    if(c.open) c.send(payload);
-                });
-            } else if(hostConnection && hostConnection.open) {
-                hostConnection.send(payload);
             }
         }
 
@@ -562,17 +430,17 @@
 
             video.onplay = () => {
                 updatePlayPauseButton(true);
-                broadcastToRoom({ type: 'PLAY', time: video.currentTime, sender: isHost ? 'Host' : 'Guest' });
+                syncStateToCloud({ isPlaying: true });
             };
             video.onpause = () => {
                 updatePlayPauseButton(false);
-                broadcastToRoom({ type: 'PAUSE', time: video.currentTime, sender: isHost ? 'Host' : 'Guest' });
+                syncStateToCloud({ isPlaying: false });
             };
             video.onseeked = () => {
-                broadcastToRoom({ type: 'SEEK', time: video.currentTime, sender: isHost ? 'Host' : 'Guest' });
+                syncStateToCloud({ currentTime: video.currentTime });
             };
             video.onratechange = () => {
-                broadcastToRoom({ type: 'RATE', rate: video.playbackRate, sender: isHost ? 'Host' : 'Guest' });
+                syncStateToCloud({ speed: video.playbackRate });
             };
 
             if(callback) callback();
@@ -624,44 +492,44 @@
             const time = ytPlayer.getCurrentTime();
             if(e.data === YT.PlayerState.PLAYING) {
                 updatePlayPauseButton(true);
-                broadcastToRoom({ type: 'PLAY', time: time, sender: isHost ? 'Host' : 'Guest' });
+                syncStateToCloud({ isPlaying: true, currentTime: time });
             } else if(e.data === YT.PlayerState.PAUSED) {
                 updatePlayPauseButton(false);
-                broadcastToRoom({ type: 'PAUSE', time: time, sender: isHost ? 'Host' : 'Guest' });
+                syncStateToCloud({ isPlaying: false, currentTime: time });
             }
         }
 
+        // Periodic seek check
         setInterval(() => {
             if(isInternalSync) return;
             const curTime = getCurrentTime();
-            if(Math.abs(curTime - lastReportedTime) > 1.8 && isPlayerPlaying()) {
-                broadcastToRoom({ type: 'SEEK', time: curTime, sender: isHost ? 'Host' : 'Guest' });
+            if(Math.abs(curTime - lastReportedTime) > 2.0 && isPlayerPlaying()) {
+                syncStateToCloud({ currentTime: curTime });
             }
             lastReportedTime = curTime;
-        }, 500);
+        }, 800);
 
         function userTogglePlay() {
             const playing = isPlayerPlaying();
-            const time = getCurrentTime();
             if(playing) {
                 pauseVideo();
-                broadcastToRoom({ type: 'PAUSE', time, sender: isHost ? 'Host' : 'Guest' });
+                syncStateToCloud({ isPlaying: false });
             } else {
                 playVideo();
-                broadcastToRoom({ type: 'PLAY', time, sender: isHost ? 'Host' : 'Guest' });
+                syncStateToCloud({ isPlaying: true });
             }
         }
 
         function userSeekDelta(delta) {
             const newTime = Math.max(0, getCurrentTime() + delta);
             seekToTime(newTime);
-            broadcastToRoom({ type: 'SEEK', time: newTime, sender: isHost ? 'Host' : 'Guest' });
+            syncStateToCloud({ currentTime: newTime });
         }
 
         function userChangeSpeed(val) {
             const rate = parseFloat(val);
             setPlaybackRate(rate);
-            broadcastToRoom({ type: 'RATE', rate, sender: isHost ? 'Host' : 'Guest' });
+            syncStateToCloud({ speed: rate });
         }
 
         function updatePlayPauseButton(isPlaying) {
@@ -721,28 +589,51 @@
             return !!(nat.currentTime > 0 && !nat.paused && !nat.ended && nat.readyState > 2);
         }
 
-        // Tap to Sync Button Click
         function unlockPlayback() {
             document.getElementById('syncOverlay').classList.add('hidden');
             playVideo();
-            // Ask host for exact time immediately!
-            if(hostConnection && hostConnection.open) {
-                hostConnection.send({ type: 'REQUEST_SYNC' });
-            }
+            syncStateToCloud({ isPlaying: true });
         }
 
-        // Live Chat
+        // Live Chat with Firestore Realtime Collection
+        function listenToChat(roomId) {
+            if(chatUnsubscribe) chatUnsubscribe();
+            
+            chatUnsubscribe = db.collection('watchrooms').doc(roomId).collection('chat')
+                .orderBy('timestamp', 'asc')
+                .limitToLast(40)
+                .onSnapshot((snap) => {
+                    const container = document.getElementById('chatMessages');
+                    container.innerHTML = '';
+                    snap.forEach((doc) => {
+                        const data = doc.data();
+                        appendChatMessage({
+                            sender: data.sender,
+                            text: data.text,
+                            time: data.timeStr,
+                            isMe: data.senderId === myClientId
+                        });
+                    });
+                });
+        }
+
         function handleSendChat(e) {
             e.preventDefault();
             const input = document.getElementById('chatInput');
             const text = input.value.trim();
-            if(!text) return;
+            if(!text || !currentRoomId) return;
 
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const senderRole = isHost ? 'Host' : 'Guest';
-            appendChatMessage({ sender: senderRole, text, time: timeStr, isMe: true });
+            const senderRole = isHost ? 'Host' : 'Member';
 
-            broadcastToRoom({ type: 'CHAT_MSG', sender: senderRole, text, time: timeStr });
+            db.collection('watchrooms').doc(currentRoomId).collection('chat').add({
+                text: text,
+                sender: senderRole,
+                senderId: myClientId,
+                timeStr: timeStr,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
             input.value = '';
         }
 
@@ -767,19 +658,9 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function broadcastSystemMessage(text) {
-            const container = document.getElementById('chatMessages');
-            const msg = document.createElement('div');
-            msg.className = "text-center text-[10px] text-slate-400 font-semibold my-1";
-            msg.innerText = `⚡ ${text}`;
-            container.appendChild(msg);
-            container.scrollTop = container.scrollHeight;
-        }
-
         function showTheaterScreen(isHostRole) {
             document.getElementById('setupScreen').classList.add('hidden');
             document.getElementById('theaterScreen').classList.remove('hidden');
-            document.getElementById('roomMemberBadge').classList.remove('hidden');
 
             const badge = document.getElementById('roleBadge');
             badge.innerText = isHostRole ? "Host" : "Guest";
@@ -788,21 +669,11 @@
                 : "text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30";
         }
 
-        function updateMemberBadge(count) {
-            document.getElementById('memberCountText').innerText = `👥 ${count}/6 in Room`;
-        }
-
         function copyFullLink() {
             if(currentRoomId) {
-                let url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}`;
-                if(currentMediaType !== 'local' && currentMediaSource) {
-                    url += `&v=${encodeURIComponent(currentMediaSource)}&type=${currentMediaType}`;
-                } else if(currentMediaType === 'local') {
-                    url += `&type=local&name=${encodeURIComponent(localSelectedFileName || 'video.mp4')}`;
-                }
-
+                const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}`;
                 navigator.clipboard.writeText(url).then(() => {
-                    alert("Watch Room link copied! Share with up to 5 friends.");
+                    alert("Watch Room link copied! Share with friends.");
                 });
             }
         }
@@ -813,15 +684,12 @@
             }
         }
 
+        // Auto join directly on link open
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const rKey = params.get('room');
-            const vUrl = params.get('v');
-            const vType = params.get('type');
-            const fName = params.get('name');
-
             if(rKey) {
-                joinRoomDirectly(rKey, vUrl, vType, fName);
+                joinRoomDirectly(rKey);
             }
         });
     </script>
