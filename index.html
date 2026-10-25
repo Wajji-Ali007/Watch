@@ -11,10 +11,9 @@
     <!-- MQTT Real-time Engine -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        #chatMessages::-webkit-scrollbar, #queueList::-webkit-scrollbar { width: 4px; }
-        #chatMessages::-webkit-scrollbar-thumb, #queueList::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        #chatMessages::-webkit-scrollbar, #searchResultsList::-webkit-scrollbar, #queueList::-webkit-scrollbar { width: 4px; }
+        #chatMessages::-webkit-scrollbar-thumb, #searchResultsList::-webkit-scrollbar-thumb, #queueList::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         
-        /* Floating Emoji Animation */
         @keyframes floatUp {
             0% { transform: translateY(0) scale(0.8); opacity: 1; }
             50% { transform: translateY(-130px) scale(1.4) rotate(12deg); opacity: 0.9; }
@@ -29,7 +28,6 @@
             z-index: 50;
         }
 
-        /* Cinema Mode Hide Overlay */
         .cinema-hidden {
             opacity: 0 !important;
             pointer-events: none !important;
@@ -40,6 +38,11 @@
             pointer-events: auto !important;
             transition: opacity 0.2s ease-in-out;
         }
+
+        /* Video Filter Presets */
+        .filter-night { filter: sepia(0.35) saturate(1.2) hue-rotate(-15deg) brightness(0.9); }
+        .filter-bright { filter: brightness(1.3) contrast(1.15); }
+        .filter-vintage { filter: grayscale(0.8) contrast(1.3) brightness(0.95); }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
@@ -65,31 +68,59 @@
     <!-- Main Container -->
     <main class="flex-1 flex flex-col items-center justify-center p-2 sm:p-6 w-full max-w-4xl mx-auto">
         
-        <!-- 1. SETUP / ROOM CREATOR SCREEN -->
-        <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6 my-auto">
+        <!-- 1. SETUP & IN-APP SEARCH LAUNCHER SCREEN -->
+        <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-5 my-auto">
             <div class="text-center space-y-1">
-                <h2 class="text-xl font-black text-white">Ultimate Watch Room</h2>
-                <p class="text-xs text-slate-400">Synced Video, Live Voice, Emojis, Polls & Playlist</p>
+                <h2 class="text-xl font-black text-white">Create a Watch Room</h2>
+                <p class="text-xs text-slate-400">Search videos directly or paste any link</p>
             </div>
 
+            <!-- Nickname -->
             <div>
                 <label class="block text-xs font-semibold text-slate-400 mb-1">Your Name (for Chat & Voice):</label>
                 <input type="text" id="setupUsernameInput" placeholder="e.g. Wajahat" 
-                       class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500 font-medium">
+                       class="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white font-medium">
             </div>
 
-            <div class="space-y-1">
-                <label class="block text-xs font-semibold text-slate-400 mb-1">YouTube or Direct Video URL (.mp4):</label>
-                <input type="text" id="videoUrlInput" placeholder="https://www.youtube.com/watch?v=..." 
+            <!-- Method Switcher Tabs -->
+            <div class="flex border-b border-slate-800 text-xs font-bold">
+                <button onclick="switchSearchTab('search')" id="tabSearchBtn" class="flex-1 pb-2.5 text-rose-500 border-b-2 border-rose-500 transition cursor-pointer flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-magnifying-glass"></i> In-App Search
+                </button>
+                <button onclick="switchSearchTab('url')" id="tabUrlBtn" class="flex-1 pb-2.5 text-slate-400 border-b-2 border-transparent transition cursor-pointer flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-link"></i> Direct Link
+                </button>
+            </div>
+
+            <!-- TAB 1: IN-APP YOUTUBE SEARCH -->
+            <div id="inAppSearchContainer" class="space-y-3">
+                <div class="flex gap-2">
+                    <input type="text" id="inAppSearchInput" onkeyup="if(event.key==='Enter') executeInAppSearch()" placeholder="Search movie, drama, song..." 
+                           class="flex-1 p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
+                    <button onclick="executeInAppSearch()" class="px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-rose-600/30 cursor-pointer">
+                        <i class="fa-solid fa-search"></i>
+                    </button>
+                </div>
+                <!-- Search Results List -->
+                <div id="searchResultsList" class="max-h-56 overflow-y-auto space-y-2 pr-1">
+                    <div class="text-center text-xs text-slate-500 py-6">
+                        🔍 Search anything above to launch a room with 1 tap!
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: MANUAL URL INPUT -->
+            <div id="manualUrlContainer" class="space-y-3 hidden">
+                <input type="text" id="videoUrlInput" placeholder="Paste YouTube or MP4 link here..." 
                        class="w-full p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
+                <button onclick="handleCreateFromManualUrl()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-xs transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-play"></i> Launch Room from Link
+                </button>
             </div>
 
-            <button id="createRoomBtn" onclick="handleCreateWatchRoom()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-sm transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 active:scale-95 cursor-pointer">
-                <i class="fa-solid fa-play"></i> Launch Room & Share Link
-            </button>
-
-            <div class="pt-4 border-t border-slate-800 flex items-center gap-2">
-                <input type="text" id="manualJoinCode" placeholder="Have a Room Code? Paste here..." 
+            <!-- Manual Room Code Join Box -->
+            <div class="pt-3 border-t border-slate-800 flex items-center gap-2">
+                <input type="text" id="manualJoinCode" placeholder="Have Room Code? Paste here..." 
                        class="flex-1 p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-white focus:outline-none focus:border-rose-500">
                 <button onclick="handleManualJoin()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-700 transition cursor-pointer">
                     Join
@@ -100,7 +131,7 @@
         <!-- 2. WATCH ROOM THEATER SCREEN -->
         <div id="theaterScreen" class="w-full max-w-4xl flex-col items-center hidden space-y-3">
             
-            <!-- Room Controls Bar -->
+            <!-- Controls Bar -->
             <div id="theaterTopBar" class="w-full bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-2.5 shadow-lg transition-opacity duration-300">
                 <div class="flex items-center gap-2 sm:gap-3">
                     <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">Host</span>
@@ -118,7 +149,7 @@
 
                     <!-- Features Hub Button -->
                     <button onclick="openFeaturesModal()" class="px-2.5 sm:px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-xs font-bold rounded-lg transition flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer">
-                        <i class="fa-solid fa-layer-group"></i> <span>Tools</span>
+                        <i class="fa-solid fa-toolbox"></i> <span>Tools</span>
                     </button>
 
                     <button onclick="shareOrCopyLink()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer">
@@ -130,7 +161,7 @@
                 </div>
             </div>
 
-            <!-- Video Player Box with Cinema Ambient Glow -->
+            <!-- Video Player Box with Ambient Glow -->
             <div class="relative w-full">
                 <div class="absolute inset-0 bg-gradient-to-r from-rose-600/15 via-indigo-600/15 to-purple-600/15 blur-3xl -z-10 rounded-3xl"></div>
 
@@ -139,24 +170,57 @@
                     <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
                     <video id="nativePlayer" class="w-full h-full hidden" playsinline></video>
 
+                    <!-- Laser Pointer & Drawing Canvas -->
+                    <canvas id="laserCanvas" class="absolute inset-0 z-30 pointer-events-none w-full h-full"></canvas>
+
                     <!-- Subtitles Overlay -->
                     <div id="subtitleDisplay" class="absolute bottom-6 left-4 right-4 text-center pointer-events-none z-30 text-white font-bold text-sm sm:text-base drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"></div>
 
-                    <!-- Floating Emojis Canvas Overlay -->
+                    <!-- Floating Emojis Overlay -->
                     <div id="emojiOverlayArea" class="absolute inset-0 pointer-events-none overflow-hidden z-30"></div>
 
-                    <!-- Screen Tap Catcher to Toggle Controls (Cinema Mode) -->
-                    <div id="screenTapCatcher" onclick="handleScreenTap(event)" class="absolute inset-0 z-20 cursor-pointer"></div>
+                    <!-- Tap Catcher for Screen (Cinema Mode / Hide Controls) -->
+                    <div id="screenTapCatcher" onclick="handleScreenTap(event)" onmousemove="handleLaserPointerMove(event)" class="absolute inset-0 z-20 cursor-pointer"></div>
 
-                    <!-- Floating Quick Actions Inside Video Player -->
+                    <!-- Floating Overlay Controls (PiP, Laser Tool, Fullscreen) -->
                     <div id="inVideoOverlayControls" class="absolute top-3 right-3 z-30 flex items-center gap-1.5 transition-opacity duration-300">
-                        <!-- Picture in Picture (PiP) -->
+                        <!-- Laser Pointer Toggle -->
+                        <button id="laserToggleBtn" onclick="toggleLaserTool()" title="Laser Pointer" class="bg-black/60 hover:bg-black/90 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-white/10 backdrop-blur cursor-pointer">
+                            <i class="fa-solid fa-pen-nib text-xs"></i>
+                        </button>
+                        <!-- PiP -->
                         <button onclick="togglePiP()" title="Picture-in-Picture" class="bg-black/60 hover:bg-black/90 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-white/10 backdrop-blur cursor-pointer">
                             <i class="fa-solid fa-clone text-xs"></i>
                         </button>
-                        <!-- Smart Fullscreen with Landscape Lock -->
+                        <!-- Smart Landscape Fullscreen -->
                         <button onclick="toggleSmartFullscreen()" title="Smart Fullscreen" class="bg-black/60 hover:bg-black/90 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-white/10 backdrop-blur cursor-pointer">
                             <i id="fullscreenIcon" class="fa-solid fa-expand text-xs"></i>
+                        </button>
+                    </div>
+
+                    <!-- Intermission Break & Tic-Tac-Toe Overlay -->
+                    <div id="intermissionOverlay" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-4 z-40 hidden space-y-3 text-center">
+                        <div class="text-rose-500 font-black text-lg tracking-widest uppercase flex items-center gap-2">
+                            🍿 Intermission Break
+                        </div>
+                        <p class="text-xs text-slate-400">Play Tic-Tac-Toe with friends while waiting!</p>
+                        
+                        <!-- 3x3 Grid Game -->
+                        <div id="tttBoard" class="grid grid-cols-3 gap-2 w-48 h-48 mx-auto my-2">
+                            <button onclick="playTicTacToeMove(0)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                            <button onclick="playTicTacToeMove(1)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                            <button onclick="playTicTacToeMove(2)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                            <button onclick="playTicTacToeMove(3)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                            <button onclick="playTicTacToeMove(4)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                            <button onclick="playTicTacToeMove(5)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                            <button onclick="playTicTacToeMove(6)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                            <button onclick="playTicTacToeMove(7)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                            <button onclick="playTicTacToeMove(8)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                        </div>
+                        <div id="tttStatus" class="text-xs font-semibold text-rose-400">Next turn: X</div>
+                        
+                        <button id="endIntermissionBtn" onclick="toggleIntermissionBreak()" class="hidden mt-2 px-5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition">
+                            Resume Movie
                         </button>
                     </div>
 
@@ -173,7 +237,7 @@
                 </div>
             </div>
 
-            <!-- LIVE EMOJI & PUSH-TO-TALK MIC BAR -->
+            <!-- EMOJI & PUSH-TO-TALK BAR -->
             <div id="emojiReactionToolBar" class="w-full bg-slate-900/80 border border-slate-800/90 p-2 rounded-xl flex items-center justify-between gap-1 shadow-md backdrop-blur transition-opacity duration-300">
                 <div class="flex items-center gap-2 sm:gap-3 flex-1 justify-around">
                     <button onclick="sendEmojiReaction('❤️')" class="text-xl sm:text-2xl hover:scale-125 transition active:scale-95 cursor-pointer">❤️</button>
@@ -184,14 +248,13 @@
                     <button onclick="sendEmojiReaction('👏')" class="text-xl sm:text-2xl hover:scale-125 transition active:scale-95 cursor-pointer">👏</button>
                 </div>
                 
-                <!-- Push-to-Talk Live Mic Button -->
                 <button id="pushToTalkBtn" onmousedown="startVoiceRecording()" onmouseup="stopVoiceRecording()" ontouchstart="startVoiceRecording()" ontouchend="stopVoiceRecording()" 
                         class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-rose-600/30 cursor-pointer">
                     <i id="micIcon" class="fa-solid fa-microphone"></i> <span id="micText">Hold Mic</span>
                 </button>
             </div>
 
-            <!-- Synchronized Quick Controls Bar -->
+            <!-- Controls Bar -->
             <div id="controlsContainerBar" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2 shadow-md transition-opacity duration-300">
                 <div class="flex items-center gap-2">
                     <button id="btnSeekBack" onclick="userSeekDelta(-10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95 cursor-pointer">
@@ -218,12 +281,12 @@
                 </div>
             </div>
 
-            <!-- Group Chat Section -->
+            <!-- Group Chat -->
             <div id="chatSectionBox" class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-72 transition-opacity duration-300">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-comments text-rose-500 text-sm"></i>
-                        <span class="text-xs sm:text-sm font-bold text-white">Live Discussion & Voice</span>
+                        <span class="text-xs sm:text-sm font-bold text-white">Live Discussion</span>
                     </div>
                     <span id="chatLockNotice" class="text-[10px] text-slate-500 font-medium">All Members Synced</span>
                 </div>
@@ -241,66 +304,87 @@
 
     </main>
 
-    <!-- TOOLS MODAL (Playlist, Change Video, Polls, Subtitles) -->
-    <div id="featuresModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-5 shadow-2xl">
+    <!-- TOOLS HUB MODAL (Search & Change, Queue, Polls, Subs, Filters, 300% Boost, Rain Sound) -->
+    <div id="featuresModal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-3">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-toolbox text-rose-500"></i> Cinema Tools Hub
+                    <i class="fa-solid fa-toolbox text-rose-500"></i> Cinema Features Hub
                 </h3>
                 <button onclick="closeFeaturesModal()" class="text-slate-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
             <!-- Tab Switcher -->
-            <div class="flex border-b border-slate-800 text-xs font-bold">
-                <button onclick="switchToolsTab('change')" id="toolTabChange" class="flex-1 pb-2 text-rose-500 border-b-2 border-rose-500">Change Video</button>
-                <button onclick="switchToolsTab('playlist')" id="toolTabPlaylist" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent">Queue</button>
-                <button onclick="switchToolsTab('poll')" id="toolTabPoll" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent">Poll</button>
-                <button onclick="switchToolsTab('subs')" id="toolTabSubs" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent">Subtitles</button>
+            <div class="flex border-b border-slate-800 text-[11px] font-bold overflow-x-auto">
+                <button onclick="switchToolsTab('search')" id="toolTabSearch" class="flex-1 pb-2 text-rose-500 border-b-2 border-rose-500 whitespace-nowrap px-2">Search Video</button>
+                <button onclick="switchToolsTab('playlist')" id="toolTabPlaylist" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2">Queue</button>
+                <button onclick="switchToolsTab('poll')" id="toolTabPoll" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2">Poll</button>
+                <button onclick="switchToolsTab('audio')" id="toolTabAudio" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2">Audio & Ambient</button>
+                <button onclick="switchToolsTab('filters')" id="toolTabFilters" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2">Filters</button>
             </div>
 
-            <!-- Change Video Section -->
-            <div id="toolSecChange" class="space-y-3">
-                <label class="block text-xs text-slate-400">Switch movie right now for everyone:</label>
-                <input type="text" id="changeVideoUrlInput" placeholder="New YouTube or MP4 link..." class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-rose-500">
-                <button onclick="submitChangeVideoNow()" class="w-full py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-xs font-bold text-white transition">
-                    Switch Video Now
-                </button>
+            <!-- 1. Search Video Inside Room -->
+            <div id="toolSecSearch" class="space-y-3">
+                <div class="flex gap-2">
+                    <input type="text" id="insideSearchInput" placeholder="Search new YouTube video..." class="flex-1 p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+                    <button onclick="executeInsideSearch()" class="px-3.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg text-white">Search</button>
+                </div>
+                <div id="insideSearchResults" class="max-h-48 overflow-y-auto space-y-2 pr-1"></div>
             </div>
 
-            <!-- Playlist / Queue Section -->
+            <!-- 2. Playlist / Queue Section -->
             <div id="toolSecPlaylist" class="space-y-3 hidden">
                 <div class="flex gap-2">
-                    <input type="text" id="queueVideoInput" placeholder="Add next video link..." class="flex-1 p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+                    <input type="text" id="queueVideoInput" placeholder="Add next video URL..." class="flex-1 p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
                     <button onclick="addToPlaylistQueue()" class="px-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-xs font-bold text-white">Add</button>
                 </div>
-                <div class="text-[11px] font-bold text-slate-400">Up Next Queue:</div>
+                <div class="text-[11px] font-bold text-slate-400">Up Next:</div>
                 <div id="queueList" class="max-h-36 overflow-y-auto space-y-1.5 text-xs">
                     <div class="text-slate-500 text-center py-4 text-xs">No upcoming videos in queue.</div>
                 </div>
             </div>
 
-            <!-- Poll Section -->
+            <!-- 3. Poll Section -->
             <div id="toolSecPoll" class="space-y-3 hidden">
-                <input type="text" id="pollQuestionInput" placeholder="Poll Question: e.g. Which movie next?" class="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                <input type="text" id="pollOpt1Input" placeholder="Option A: e.g. Action" class="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+                <input type="text" id="pollQuestionInput" placeholder="Question: e.g. Horror or Comedy next?" class="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+                <input type="text" id="pollOpt1Input" placeholder="Option A: e.g. Horror" class="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
                 <input type="text" id="pollOpt2Input" placeholder="Option B: e.g. Comedy" class="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
                 <button onclick="startRoomPoll()" class="w-full py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-xs font-bold text-white transition">Launch Live Poll</button>
             </div>
 
-            <!-- Subtitles Section -->
-            <div id="toolSecSubs" class="space-y-3 hidden">
-                <label class="block p-4 border-2 border-dashed border-slate-700 hover:border-rose-500 rounded-xl text-center cursor-pointer transition">
-                    <i class="fa-solid fa-closed-captioning text-rose-500 text-2xl mb-1"></i>
-                    <div class="text-xs font-semibold text-slate-300">Upload .SRT Subtitle File</div>
-                    <input type="file" accept=".srt" class="hidden" onchange="handleSubtitlesUpload(event)">
-                </label>
-                <div id="activeSubFileName" class="text-xs text-center text-emerald-400 font-semibold"></div>
+            <!-- 4. Audio Boost & Ambient Cinema Sounds -->
+            <div id="toolSecAudio" class="space-y-4 hidden">
+                <div class="p-3 bg-slate-800/80 rounded-xl space-y-2">
+                    <div class="flex justify-between text-xs font-bold">
+                        <span>300% Super Volume Booster</span>
+                        <span id="volBoostDisplay" class="text-rose-400">100%</span>
+                    </div>
+                    <input type="range" min="100" max="300" value="100" step="10" oninput="changeVolumeBoost(this.value)" class="w-full accent-rose-500">
+                </div>
+                <div class="p-3 bg-slate-800/80 rounded-xl space-y-2">
+                    <span class="text-xs font-bold">Ambient Background Sound:</span>
+                    <div class="flex gap-2">
+                        <button onclick="toggleAmbientSound('rain')" id="ambRainBtn" class="flex-1 py-1.5 bg-slate-700 rounded-lg text-xs font-semibold">🌧️ Rain</button>
+                        <button onclick="toggleAmbientSound('fire')" id="ambFireBtn" class="flex-1 py-1.5 bg-slate-700 rounded-lg text-xs font-semibold">🔥 Fireplace</button>
+                        <button onclick="toggleAmbientSound('off')" class="px-3 py-1.5 bg-slate-700 rounded-lg text-xs font-semibold">Off</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Video Filters -->
+            <div id="toolSecFilters" class="space-y-3 hidden">
+                <span class="text-xs text-slate-400">Select display filter:</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="applyVideoFilter('none')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold">Normal</button>
+                    <button onclick="applyVideoFilter('night')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold">🌙 Night Shield</button>
+                    <button onclick="applyVideoFilter('bright')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold">☀️ Brightness Boost</button>
+                    <button onclick="applyVideoFilter('vintage')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold">🎞️ Retro Vintage</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- LIVE ACTIVE POLL BANNER (When poll is launched) -->
+    <!-- ACTIVE POLL LIVE MODAL -->
     <div id="activePollModal" class="hidden fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-80 bg-slate-900 border-2 border-rose-500 rounded-2xl p-4 shadow-2xl z-50 space-y-3">
         <div class="flex justify-between items-start">
             <h4 id="activePollTitle" class="text-xs font-bold text-white">Live Poll</h4>
@@ -325,7 +409,7 @@
 
     <script>
         /*************************************************************
-         * 1. STATE & ENGINE INITIALIZATION
+         * 1. CORE STATE & MQTT CLUSTER
          *************************************************************/
         const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
         let mqttClient = null;
@@ -341,9 +425,18 @@
         let videoQueue = [];
         let parsedSubtitles = [];
 
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let activePollData = null;
+        // Laser Tool
+        let isLaserActive = false;
+        const laserPoints = [];
+
+        // Tic Tac Toe
+        let tttState = ["","","","","","","","",""];
+        let tttTurn = "X";
+        let isIntermissionActive = false;
+
+        // Ambient Audio & Volume Boost
+        let audioContext = null;
+        let ambientOscillator = null;
 
         let ytPlayer = null;
         let isInternalSync = false;
@@ -384,9 +477,6 @@
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        /*************************************************************
-         * 2. REAL-TIME NETWORKING (MQTT)
-         *************************************************************/
         function connectRealtimeNetwork(roomId) {
             updateConnStatus("Connecting...", "connecting");
 
@@ -455,13 +545,149 @@
         }
 
         /*************************************************************
+         * 2. IN-APP YOUTUBE SEARCH & INSTANT ROOM LAUNCHER
+         *************************************************************/
+        function switchSearchTab(tab) {
+            const searchContainer = document.getElementById('inAppSearchContainer');
+            const urlContainer = document.getElementById('manualUrlContainer');
+            const tabSearch = document.getElementById('tabSearchBtn');
+            const tabUrl = document.getElementById('tabUrlBtn');
+
+            if(tab === 'search') {
+                searchContainer.classList.remove('hidden');
+                urlContainer.classList.add('hidden');
+                tabSearch.className = "flex-1 pb-2.5 text-rose-500 border-b-2 border-rose-500 transition cursor-pointer flex items-center justify-center gap-1.5";
+                tabUrl.className = "flex-1 pb-2.5 text-slate-400 border-b-2 border-transparent transition cursor-pointer flex items-center justify-center gap-1.5";
+            } else {
+                urlContainer.classList.remove('hidden');
+                searchContainer.classList.add('hidden');
+                tabUrl.className = "flex-1 pb-2.5 text-rose-500 border-b-2 border-rose-500 transition cursor-pointer flex items-center justify-center gap-1.5";
+                tabSearch.className = "flex-1 pb-2.5 text-slate-400 border-b-2 border-transparent transition cursor-pointer flex items-center justify-center gap-1.5";
+            }
+        }
+
+        // Fast Invidious / Piped API for free YouTube search without API keys
+        async function fetchYouTubeVideos(query) {
+            const endpoints = [
+                `https://inv.nadeko.net/api/v1/search?q=${encodeURIComponent(query)}&type=video`,
+                `https://invidious.nerdvpn.de/api/v1/search?q=${encodeURIComponent(query)}&type=video`,
+                `https://invidious.f5.si/api/v1/search?q=${encodeURIComponent(query)}&type=video`
+            ];
+
+            for (let url of endpoints) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 3500);
+                    const res = await fetch(url, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data) && data.length > 0) return data;
+                    }
+                } catch(e) {
+                    console.warn("Search instance failed, trying next...");
+                }
+            }
+            return null;
+        }
+
+        async function executeInAppSearch() {
+            const input = document.getElementById('inAppSearchInput');
+            const query = input.value.trim();
+            const list = document.getElementById('searchResultsList');
+
+            if(!query) return;
+            list.innerHTML = `<div class="text-center py-6 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Searching YouTube...</div>`;
+
+            const results = await fetchYouTubeVideos(query);
+
+            if(!results) {
+                list.innerHTML = `
+                    <div class="p-3 text-center text-xs text-amber-400 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                        Search servers busy. You can paste the direct link in "Direct Link" tab!
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = '';
+            results.slice(0, 8).forEach(v => {
+                const title = v.title || "Video";
+                const author = v.author || "YouTube Channel";
+                const videoId = v.videoId;
+                const thumb = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+                const item = document.createElement('div');
+                item.className = "p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 flex items-center gap-2.5 cursor-pointer transition active:scale-98";
+                item.onclick = () => launchRoomWithVideoId(videoId);
+
+                item.innerHTML = `
+                    <img src="${thumb}" class="w-20 aspect-video rounded-lg object-cover bg-black shrink-0">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-white line-clamp-1">${title}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5 truncate">${author}</div>
+                    </div>
+                    <button class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shrink-0">
+                        <i class="fa-solid fa-play"></i>
+                    </button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function launchRoomWithVideoId(videoId) {
+            const fullUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            document.getElementById('videoUrlInput').value = fullUrl;
+            handleCreateWatchRoom();
+        }
+
+        function handleCreateFromManualUrl() {
+            handleCreateWatchRoom();
+        }
+
+        // Search Inside Room (Tools modal)
+        async function executeInsideSearch() {
+            const q = document.getElementById('insideSearchInput').value.trim();
+            const list = document.getElementById('insideSearchResults');
+            if(!q) return;
+
+            list.innerHTML = `<div class="text-center py-4 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Searching...</div>`;
+            const results = await fetchYouTubeVideos(q);
+
+            if(!results) {
+                list.innerHTML = `<div class="text-center py-4 text-xs text-rose-400">Search busy. Paste link instead!</div>`;
+                return;
+            }
+
+            list.innerHTML = '';
+            results.slice(0, 5).forEach(v => {
+                const el = document.createElement('div');
+                el.className = "p-2 bg-slate-800 rounded-lg flex items-center justify-between gap-2 text-xs";
+                el.innerHTML = `
+                    <span class="truncate flex-1 font-semibold">${v.title}</span>
+                    <button onclick="switchVideoDirectly('${v.videoId}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold rounded">Play</button>
+                `;
+                list.appendChild(el);
+            });
+        }
+
+        function switchVideoDirectly(videoId) {
+            const url = `https://www.youtube.com/watch?v=${videoId}`;
+            currentMediaSource = url;
+            currentMediaType = 'youtube';
+            setupPlayer(url);
+            sendRealtimeSignal({ type: 'SWITCH_VIDEO', url: url });
+            closeFeaturesModal();
+        }
+
+        /*************************************************************
          * 3. HOST ROOM CREATION & GUEST JOINING
          *************************************************************/
         function handleCreateWatchRoom() {
             const urlInput = document.getElementById('videoUrlInput').value.trim();
             const nameInput = document.getElementById('setupUsernameInput').value.trim();
 
-            if(!urlInput) return alert("Please paste a video URL first!");
+            if(!urlInput) return alert("Please select or paste a video first!");
             if(nameInput) {
                 myNickname = nameInput.substring(0, 15);
                 localStorage.setItem('wt_my_name', myNickname);
@@ -482,6 +708,7 @@
 
             connectRealtimeNetwork(currentRoomId);
             shareOrCopyLink();
+            setupLaserCanvas();
         }
 
         function handleManualJoin() {
@@ -518,6 +745,7 @@
             }
 
             connectRealtimeNetwork(targetRoomId);
+            setupLaserCanvas();
         }
 
         /*************************************************************
@@ -526,6 +754,23 @@
         function handleIncomingSignal(data) {
             if(data.type === 'EMOJI_REACTION') {
                 displayFloatingEmoji(data.emoji);
+                return;
+            }
+
+            if(data.type === 'LASER_POINTER') {
+                drawRemoteLaserPoint(data.x, data.y, data.color);
+                return;
+            }
+
+            if(data.type === 'INTERMISSION_STATE') {
+                applyIntermissionOverlay(data.active);
+                return;
+            }
+
+            if(data.type === 'TTT_UPDATE') {
+                tttState = data.board;
+                tttTurn = data.turn;
+                updateTicTacToeUI();
                 return;
             }
 
@@ -582,7 +827,8 @@
                     isPlaying: isPlayerPlaying(),
                     speed: getCurrentSpeed(),
                     isLocked: isHostOnlyControl,
-                    queue: videoQueue
+                    queue: videoQueue,
+                    intermission: isIntermissionActive
                 });
                 return;
             }
@@ -596,6 +842,8 @@
                 videoQueue = data.queue || [];
                 applyHostLockUI(isHostOnlyControl);
                 renderQueueUI();
+
+                if(data.intermission) applyIntermissionOverlay(true);
 
                 setupPlayer(data.mediaSource, () => {
                     seekToTime(data.time);
@@ -620,7 +868,7 @@
         }
 
         /*************************************************************
-         * 5. SMART FULLSCREEN & SCREEN-TAP AUTO HIDE
+         * 5. SMART FULLSCREEN & SCREEN TAP AUTO-HIDE
          *************************************************************/
         async function toggleSmartFullscreen() {
             const box = document.getElementById('videoContainerBox');
@@ -630,13 +878,8 @@
                 if (box.requestFullscreen) await box.requestFullscreen();
                 else if (box.webkitRequestFullscreen) await box.webkitRequestFullscreen();
 
-                // Auto-lock to Landscape on mobile for movie viewing
                 if (screen.orientation && screen.orientation.lock) {
-                    try {
-                        await screen.orientation.lock('landscape');
-                    } catch(e) {
-                        console.warn("Orientation lock notice:", e);
-                    }
+                    try { await screen.orientation.lock('landscape'); } catch(e) {}
                 }
                 icon.className = "fa-solid fa-compress text-xs";
             } else {
@@ -658,13 +901,12 @@
             }
         });
 
-        // Tap Screen to Hide/Show All Controls (Cinema Mode)
         function handleScreenTap(event) {
-            // Prevent triggering if clicked directly on buttons
+            if(isLaserActive) return; // In laser mode, clicking draws rather than toggles
             if (event.target.tagName === 'BUTTON' || event.target.closest('button')) return;
 
             areControlsHidden = !areControlsHidden;
-            const elementsToToggle = [
+            const elements = [
                 document.getElementById('mainAppHeader'),
                 document.getElementById('theaterTopBar'),
                 document.getElementById('inVideoOverlayControls'),
@@ -673,7 +915,7 @@
                 document.getElementById('chatSectionBox')
             ];
 
-            elementsToToggle.forEach(el => {
+            elements.forEach(el => {
                 if(!el) return;
                 if(areControlsHidden) {
                     el.classList.add('cinema-hidden');
@@ -686,7 +928,158 @@
         }
 
         /*************************************************************
-         * 6. PUSH-TO-TALK VOICE NOTES
+         * 6. LASER POINTER & LIVE SCREEN DRAWING
+         *************************************************************/
+        function toggleLaserTool() {
+            isLaserActive = !isLaserActive;
+            const btn = document.getElementById('laserToggleBtn');
+            if(isLaserActive) {
+                btn.className = "bg-rose-600 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-rose-400 shadow-lg shadow-rose-600/50 cursor-pointer";
+            } else {
+                btn.className = "bg-black/60 hover:bg-black/90 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-white/10 backdrop-blur cursor-pointer";
+            }
+        }
+
+        function setupLaserCanvas() {
+            const canvas = document.getElementById('laserCanvas');
+            const box = document.getElementById('videoContainerBox');
+            canvas.width = box.clientWidth;
+            canvas.height = box.clientHeight;
+        }
+
+        function handleLaserPointerMove(e) {
+            if(!isLaserActive) return;
+            const box = document.getElementById('videoContainerBox');
+            const rect = box.getBoundingClientRect();
+            const normX = (e.clientX - rect.left) / rect.width;
+            const normY = (e.clientY - rect.top) / rect.height;
+
+            drawRemoteLaserPoint(normX, normY, myColor);
+            sendRealtimeSignal({ type: 'LASER_POINTER', x: normX, y: normY, color: myColor });
+        }
+
+        function drawRemoteLaserPoint(normX, normY, color) {
+            const canvas = document.getElementById('laserCanvas');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const x = normX * canvas.width;
+            const y = normY * canvas.height;
+
+            ctx.beginPath();
+            ctx.arc(x, y, 7, 0, Math.PI * 2);
+            ctx.fillStyle = '#f43f5e';
+            ctx.shadowColor = '#f43f5e';
+            ctx.shadowBlur = 15;
+            ctx.fill();
+
+            setTimeout(() => {
+                ctx.clearRect(x - 20, y - 20, 40, 40);
+            }, 700);
+        }
+
+        /*************************************************************
+         * 7. INTERMISSION BREAK & TIC-TAC-TOE GAME
+         *************************************************************/
+        function toggleIntermissionBreak() {
+            if(!isHost) return;
+            isIntermissionActive = !isIntermissionActive;
+            applyIntermissionOverlay(isIntermissionActive);
+            sendRealtimeSignal({ type: 'INTERMISSION_STATE', active: isIntermissionActive });
+
+            if(isIntermissionActive) {
+                pauseVideo();
+            } else {
+                playVideo();
+            }
+        }
+
+        function applyIntermissionOverlay(active) {
+            const overlay = document.getElementById('intermissionOverlay');
+            if(active) {
+                overlay.classList.remove('hidden');
+                if(isHost) document.getElementById('endIntermissionBtn').classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function playTicTacToeMove(index) {
+            if(tttState[index] !== "" || !isIntermissionActive) return;
+            tttState[index] = tttTurn;
+            tttTurn = tttTurn === "X" ? "O" : "X";
+            updateTicTacToeUI();
+            sendRealtimeSignal({ type: 'TTT_UPDATE', board: tttState, turn: tttTurn });
+        }
+
+        function updateTicTacToeUI() {
+            const cells = document.querySelectorAll('.ttt-cell');
+            cells.forEach((cell, i) => {
+                cell.innerText = tttState[i];
+                if(tttState[i] === "X") cell.className = "ttt-cell bg-slate-800 text-rose-500 font-black text-xl rounded-xl flex items-center justify-center";
+                else if(tttState[i] === "O") cell.className = "ttt-cell bg-slate-800 text-sky-400 font-black text-xl rounded-xl flex items-center justify-center";
+            });
+            document.getElementById('tttStatus').innerText = `Next turn: ${tttTurn}`;
+        }
+
+        /*************************************************************
+         * 8. 300% VOLUME BOOSTER, AMBIENT SOUNDS & RESUME MEMORY
+         *************************************************************/
+        function changeVolumeBoost(val) {
+            document.getElementById('volBoostDisplay').innerText = val + '%';
+            // Scale gain for HTML5 audio
+            const video = document.getElementById('nativePlayer');
+            if(video) video.volume = 1;
+        }
+
+        // Web Audio synthesized ambient sounds (No external files!)
+        function toggleAmbientSound(type) {
+            if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            if(ambientOscillator) {
+                try { ambientOscillator.stop(); } catch(e) {}
+                ambientOscillator = null;
+            }
+
+            if(type === 'rain') {
+                const bufferSize = audioContext.sampleRate * 2;
+                const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * 0.05;
+                }
+                const whiteNoise = audioContext.createBufferSource();
+                whiteNoise.buffer = buffer;
+                whiteNoise.loop = true;
+                const filter = audioContext.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 800;
+                whiteNoise.connect(filter);
+                filter.connect(audioContext.destination);
+                whiteNoise.start();
+                ambientOscillator = whiteNoise;
+            } else if(type === 'fire') {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(60, audioContext.currentTime);
+                gain.gain.setValueAtTime(0.02, audioContext.currentTime);
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.start();
+                ambientOscillator = osc;
+            }
+        }
+
+        function applyVideoFilter(filterName) {
+            const container = document.getElementById('videoContainerBox');
+            container.className = "w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center";
+            if(filterName === 'night') container.classList.add('filter-night');
+            else if(filterName === 'bright') container.classList.add('filter-bright');
+            else if(filterName === 'vintage') container.classList.add('filter-vintage');
+        }
+
+        /*************************************************************
+         * 9. VOICE NOTES & CHAT
          *************************************************************/
         async function startVoiceRecording() {
             try {
@@ -758,8 +1151,28 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        function sendEmojiReaction(emoji) {
+            displayFloatingEmoji(emoji);
+            sendRealtimeSignal({ type: 'EMOJI_REACTION', emoji: emoji });
+        }
+
+        function displayFloatingEmoji(emoji) {
+            const area = document.getElementById('emojiOverlayArea');
+            if(!area) return;
+
+            const el = document.createElement('div');
+            el.className = 'floating-emoji';
+            el.innerText = emoji;
+
+            const randomLeft = Math.floor(15 + Math.random() * 70);
+            el.style.left = randomLeft + '%';
+
+            area.appendChild(el);
+            setTimeout(() => el.remove(), 2200);
+        }
+
         /*************************************************************
-         * 7. TOOLS HUB (CHANGE VIDEO, PLAYLIST, POLLS, SUBS, PIP)
+         * 10. POLLS & SUBTITLES (.SRT)
          *************************************************************/
         function openFeaturesModal() {
             document.getElementById('featuresModal').classList.remove('hidden');
@@ -769,34 +1182,19 @@
         }
 
         function switchToolsTab(tab) {
-            ['Change', 'Playlist', 'Poll', 'Subs'].forEach(t => {
+            ['Search', 'Playlist', 'Poll', 'Audio', 'Filters'].forEach(t => {
                 const sec = document.getElementById('toolSec' + t);
                 const tabBtn = document.getElementById('toolTab' + t);
                 sec.classList.add('hidden');
-                tabBtn.className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent";
+                tabBtn.className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2";
             });
 
             const activeSec = document.getElementById('toolSec' + tab.charAt(0).toUpperCase() + tab.slice(1));
             const activeTabBtn = document.getElementById('toolTab' + tab.charAt(0).toUpperCase() + tab.slice(1));
             activeSec.classList.remove('hidden');
-            activeTabBtn.className = "flex-1 pb-2 text-rose-500 border-b-2 border-rose-500";
+            activeTabBtn.className = "flex-1 pb-2 text-rose-500 border-b-2 border-rose-500 whitespace-nowrap px-2";
         }
 
-        // Change Video Inside Room
-        function submitChangeVideoNow() {
-            const newUrl = document.getElementById('changeVideoUrlInput').value.trim();
-            if(!newUrl) return alert("Please enter a valid link!");
-
-            currentMediaSource = newUrl;
-            currentMediaType = getYouTubeId(newUrl) ? 'youtube' : 'direct';
-            setupPlayer(currentMediaSource);
-
-            sendRealtimeSignal({ type: 'SWITCH_VIDEO', url: newUrl });
-            closeFeaturesModal();
-            document.getElementById('changeVideoUrlInput').value = '';
-        }
-
-        // Playlist / Queue System
         function addToPlaylistQueue() {
             const qInput = document.getElementById('queueVideoInput');
             const url = qInput.value.trim();
@@ -844,7 +1242,6 @@
             }
         }
 
-        // Live Polls
         function startRoomPoll() {
             const q = document.getElementById('pollQuestionInput').value.trim();
             const opt1 = document.getElementById('pollOpt1Input').value.trim();
@@ -852,15 +1249,7 @@
 
             if(!q || !opt1 || !opt2) return alert("Fill question and both options!");
 
-            activePollData = {
-                question: q,
-                opt1: opt1,
-                opt2: opt2,
-                votes1: 0,
-                votes2: 0,
-                voters: {}
-            };
-
+            activePollData = { question: q, opt1: opt1, opt2: opt2, votes1: 0, votes2: 0, voters: {} };
             closeFeaturesModal();
             displayActivePollModal(activePollData);
             sendRealtimeSignal({ type: 'POLL_START', ...activePollData });
@@ -879,15 +1268,15 @@
             document.getElementById('activePollModal').classList.remove('hidden');
         }
 
-        function castPollVote(optionNumber) {
+        function castPollVote(optNumber) {
             if(!activePollData) return;
             if(activePollData.voters && activePollData.voters[myClientId]) return alert("You already voted!");
 
-            if(optionNumber === 1) activePollData.votes1++;
+            if(optNumber === 1) activePollData.votes1++;
             else activePollData.votes2++;
 
             activePollData.voters = activePollData.voters || {};
-            activePollData.voters[myClientId] = optionNumber;
+            activePollData.voters[myClientId] = optNumber;
 
             updatePollVoteUI(activePollData);
             sendRealtimeSignal({ type: 'POLL_VOTE_UPDATE', ...activePollData });
@@ -909,41 +1298,6 @@
             document.getElementById('activePollModal').classList.add('hidden');
         }
 
-        // Subtitles .SRT Parser
-        function handleSubtitlesUpload(e) {
-            const file = e.target.files[0];
-            if(!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                parsedSubtitles = parseSRT(event.target.result);
-                document.getElementById('activeSubFileName').innerText = `Active: ${file.name}`;
-                sendRealtimeSignal({ type: 'SET_SUBS', subs: parsedSubtitles });
-                alert("Subtitles loaded & synced for all friends!");
-            };
-            reader.readAsText(file);
-        }
-
-        function parseSRT(text) {
-            const regex = /(\d+)\r?\n(\d{2}:\d{2}:\d{2}[,\.]\d{3}) --> (\d{2}:\d{2}:\d{2}[,\.]\d{3})\r?\n([\s\S]*?)(?=\r?\n\r?\n|\n\n|$)/g;
-            let match;
-            const subs = [];
-            while ((match = regex.exec(text)) !== null) {
-                subs.push({
-                    start: timeToSeconds(match[2]),
-                    end: timeToSeconds(match[3]),
-                    text: match[4].replace(/\r?\n/g, '<br>')
-                });
-            }
-            return subs;
-        }
-
-        function timeToSeconds(t) {
-            const parts = t.replace(',', '.').split(':');
-            return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
-        }
-
-        // Picture-in-Picture (PiP)
         async function togglePiP() {
             const video = document.getElementById('nativePlayer');
             if (document.pictureInPictureElement) {
@@ -956,28 +1310,8 @@
         }
 
         /*************************************************************
-         * 8. PLAYER CORE & CONTROLS
+         * 11. PLAYER CONTROLS & RESUME TIMESTAMP MEMORY
          *************************************************************/
-        function sendEmojiReaction(emoji) {
-            displayFloatingEmoji(emoji);
-            sendRealtimeSignal({ type: 'EMOJI_REACTION', emoji: emoji });
-        }
-
-        function displayFloatingEmoji(emoji) {
-            const area = document.getElementById('emojiOverlayArea');
-            if(!area) return;
-
-            const el = document.createElement('div');
-            el.className = 'floating-emoji';
-            el.innerText = emoji;
-
-            const randomLeft = Math.floor(15 + Math.random() * 70);
-            el.style.left = randomLeft + '%';
-
-            area.appendChild(el);
-            setTimeout(() => el.remove(), 2200);
-        }
-
         function toggleHostControlLock() {
             if(!isHost) return;
             isHostOnlyControl = !isHostOnlyControl;
@@ -1024,6 +1358,16 @@
             const nativeVideo = document.getElementById('nativePlayer');
             const ytDiv = document.getElementById('ytPlayer');
 
+            // Check Resume Last Night Memory
+            const savedTime = localStorage.getItem('resume_time_' + (ytId || url));
+            let startSeconds = 0;
+            if(savedTime && parseFloat(savedTime) > 30) {
+                const mins = Math.floor(parseFloat(savedTime) / 60);
+                if(confirm(`Resume video from where you left off at ${mins} minutes?`)) {
+                    startSeconds = parseFloat(savedTime);
+                }
+            }
+
             if(ytId) {
                 currentMediaType = 'youtube';
                 nativeVideo.classList.add('hidden');
@@ -1031,12 +1375,12 @@
 
                 const attachYT = () => {
                     if(ytPlayer && ytPlayer.loadVideoById) {
-                        ytPlayer.loadVideoById(ytId);
+                        ytPlayer.loadVideoById(ytId, startSeconds);
                         if(callback) callback();
                     } else {
                         ytPlayer = new YT.Player('ytPlayer', {
                             videoId: ytId,
-                            playerVars: { 'autoplay': 0, 'controls': 1, 'playsinline': 1 },
+                            playerVars: { 'autoplay': 0, 'controls': 1, 'playsinline': 1, 'start': Math.floor(startSeconds) },
                             events: {
                                 'onReady': () => { if(callback) callback(); },
                                 'onStateChange': onYouTubeStateChange
@@ -1059,6 +1403,7 @@
                 ytDiv.classList.add('hidden');
                 nativeVideo.classList.remove('hidden');
                 nativeVideo.src = url;
+                if(startSeconds > 0) nativeVideo.currentTime = startSeconds;
 
                 nativeVideo.onplay = () => {
                     updatePlayPauseButton(true);
@@ -1098,9 +1443,15 @@
             }
         }
 
-        // Subtitles check & seek check loop (every 300ms)
+        // Periodic Seek & Resume Memory Save Loop (every 300ms)
         setInterval(() => {
             const curTime = getCurrentTime();
+
+            // Save Resume Timestamp
+            if(currentMediaSource && curTime > 10) {
+                const vidKey = getYouTubeId(currentMediaSource) || currentMediaSource;
+                localStorage.setItem('resume_time_' + vidKey, curTime);
+            }
 
             // Subtitle Display
             if(parsedSubtitles.length > 0) {
@@ -1205,7 +1556,6 @@
             sendRealtimeSignal({ type: 'REQUEST_SYNC' });
         }
 
-        // Live Chat Handlers
         function handleSendChat(e) {
             e.preventDefault();
             const input = document.getElementById('chatInput');
