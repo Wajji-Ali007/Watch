@@ -3,16 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WatchRoom - Synchronized Movie Room</title>
+    <title>WatchRoom - VIP Synced Cinema</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome -->
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- MQTT Engine -->
+    <!-- Real-time MQTT Engine -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         #chatMessages::-webkit-scrollbar { width: 4px; }
         #chatMessages::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.8); opacity: 1; }
+            50% { transform: translateY(-130px) scale(1.4) rotate(12deg); opacity: 0.9; }
+            100% { transform: translateY(-260px) scale(1) rotate(-12deg); opacity: 0; }
+        }
+        .floating-emoji {
+            position: absolute;
+            bottom: 25px;
+            font-size: 2.2rem;
+            pointer-events: none;
+            animation: floatUp 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            z-index: 50;
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased select-none">
@@ -25,12 +39,12 @@
         </div>
         
         <div class="flex items-center gap-2">
+            <button onclick="promptChangeName()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-semibold text-slate-300 flex items-center gap-1 transition cursor-pointer">
+                <i class="fa-solid fa-user-pen text-rose-400"></i> <span id="topUsernameDisplay">You</span>
+            </button>
             <div id="connStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                 <span id="connStatusText">Active</span>
-            </div>
-            <div id="roomMemberBadge" class="hidden flex items-center gap-1.5 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 text-xs font-bold text-slate-300">
-                <span id="memberCountText">👥 Live Room</span>
             </div>
         </div>
     </header>
@@ -38,12 +52,19 @@
     <!-- Main Container -->
     <main class="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full max-w-4xl mx-auto">
         
-        <!-- 1. SETUP SCREEN -->
+        <!-- 1. SETUP / ROOM CREATOR SCREEN -->
         <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
             
             <div class="text-center space-y-1">
                 <h2 class="text-lg font-black text-white">Create a Watch Room</h2>
-                <p class="text-xs text-slate-400">Watch synchronized videos with up to 6 friends</p>
+                <p class="text-xs text-slate-400">Watch videos together with live emojis, memes & chat</p>
+            </div>
+
+            <!-- Nickname Input -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Your Name (for Chat):</label>
+                <input type="text" id="setupUsernameInput" placeholder="e.g. Wajahat" 
+                       class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
             </div>
 
             <!-- Video Link Input -->
@@ -83,6 +104,11 @@
                 </div>
 
                 <div class="flex items-center gap-2">
+                    <!-- Host Only Lock Toggle -->
+                    <button id="hostControlToggleBtn" onclick="toggleHostControlLock()" class="hidden px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-700 text-slate-300 transition items-center gap-1.5 cursor-pointer">
+                        <i id="lockIcon" class="fa-solid fa-lock-open text-emerald-400"></i> <span id="lockText">All Control</span>
+                    </button>
+
                     <button onclick="shareOrCopyLink()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">
                         <i class="fa-solid fa-share-nodes"></i> Share Link
                     </button>
@@ -92,33 +118,73 @@
                 </div>
             </div>
 
-            <!-- Video Player -->
-            <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
-                <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
-                <video id="nativePlayer" class="w-full h-full hidden" playsinline></video>
+            <!-- Cinema Ambient Glow & Video Box -->
+            <div class="relative w-full">
+                <div class="absolute inset-0 bg-gradient-to-r from-rose-600/15 via-indigo-600/15 to-purple-600/15 blur-3xl -z-10 rounded-3xl"></div>
 
-                <!-- Mobile Autoplay Unlock Overlay -->
-                <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-30 hidden p-4 text-center">
-                    <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
-                        <i class="fa-solid fa-play ml-1"></i>
-                    </div>
-                    <h3 class="text-base font-bold text-white">Tap to Start Watching</h3>
-                    <button onclick="unlockPlayback()" class="px-6 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs transition cursor-pointer">
-                        Watch Together
+                <div id="videoContainerBox" class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
+                    <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
+                    <video id="nativePlayer" class="w-full h-full hidden" playsinline></video>
+
+                    <!-- Floating Emojis Canvas Overlay -->
+                    <div id="emojiOverlayArea" class="absolute inset-0 pointer-events-none overflow-hidden z-30"></div>
+
+                    <!-- Fullscreen Toggle Button -->
+                    <button onclick="toggleFullscreen()" title="Fullscreen" class="absolute top-3 right-3 z-30 bg-black/60 hover:bg-black/90 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-white/10 backdrop-blur cursor-pointer">
+                        <i id="fullscreenIcon" class="fa-solid fa-expand text-xs"></i>
                     </button>
+
+                    <!-- Mobile Autoplay Unlock Overlay -->
+                    <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-40 hidden p-4 text-center">
+                        <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
+                            <i class="fa-solid fa-play ml-1"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-white">Tap to Start Watching</h3>
+                        <button onclick="unlockPlayback()" class="px-6 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs transition cursor-pointer">
+                            Watch Together
+                        </button>
+                    </div>
                 </div>
             </div>
 
+            <!-- LIVE FLOATING EMOJI REACTION BAR -->
+            <div class="w-full bg-slate-900/80 border border-slate-800/90 p-2 rounded-xl flex items-center justify-around shadow-md backdrop-blur">
+                <span class="text-[11px] font-bold text-slate-400 hidden sm:inline"><i class="fa-solid fa-wand-magic-sparkles text-rose-400 mr-1"></i> React:</span>
+                <button onclick="sendEmojiReaction('❤️')" class="text-xl sm:text-2xl hover:scale-125 transition active:scale-95 cursor-pointer">❤️</button>
+                <button onclick="sendEmojiReaction('😂')" class="text-xl sm:text-2xl hover:scale-125 transition active:scale-95 cursor-pointer">😂</button>
+                <button onclick="sendEmojiReaction('🔥')" class="text-xl sm:text-2xl hover:scale-125 transition active:scale-95 cursor-pointer">🔥</button>
+                <button onclick="sendEmojiReaction('😱')" class="text-xl sm:text-2xl hover:scale-125 transition active:scale-95 cursor-pointer">😱</button>
+                <button onclick="sendEmojiReaction('🍿')" class="text-xl sm:text-2xl hover:scale-125 transition active:scale-95 cursor-pointer">🍿</button>
+                <button onclick="sendEmojiReaction('👏')" class="text-xl sm:text-2xl hover:scale-125 transition active:scale-95 cursor-pointer">👏</button>
+            </div>
+
+            <!-- MEME SOUND EFFECTS BAR -->
+            <div class="w-full bg-slate-900/60 border border-slate-800/70 p-2 rounded-xl flex items-center justify-center gap-2 sm:gap-4 shadow-sm text-xs font-semibold">
+                <span class="text-[11px] text-slate-400 font-bold"><i class="fa-solid fa-volume-high text-amber-400 mr-1"></i> Memes:</span>
+                <button onclick="triggerMemeSound('horn')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 border border-slate-700 transition active:scale-95 cursor-pointer">
+                    🎺 Horn
+                </button>
+                <button onclick="triggerMemeSound('laugh')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 border border-slate-700 transition active:scale-95 cursor-pointer">
+                    😂 Laugh
+                </button>
+                <button onclick="triggerMemeSound('bruh')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 border border-slate-700 transition active:scale-95 cursor-pointer">
+                    🤦 Bruh
+                </button>
+                <button onclick="triggerMemeSound('boing')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 border border-slate-700 transition active:scale-95 cursor-pointer">
+                    🛎️ Boing
+                </button>
+            </div>
+
             <!-- Synchronized Quick Controls -->
-            <div class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2 shadow-md">
+            <div id="controlsContainerBar" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2 shadow-md">
                 <div class="flex items-center gap-2">
-                    <button onclick="userSeekDelta(-10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95 cursor-pointer">
+                    <button id="btnSeekBack" onclick="userSeekDelta(-10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95 cursor-pointer">
                         <i class="fa-solid fa-rotate-left"></i> -10s
                     </button>
                     <button id="togglePlayBtn" onclick="userTogglePlay()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-xs font-bold text-white flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-rose-600/20 cursor-pointer">
                         <i id="playIcon" class="fa-solid fa-pause"></i> <span id="playText">Pause</span>
                     </button>
-                    <button onclick="userSeekDelta(10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95 cursor-pointer">
+                    <button id="btnSeekForward" onclick="userSeekDelta(10)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1 transition active:scale-95 cursor-pointer">
                         +10s <i class="fa-solid fa-rotate-right"></i>
                     </button>
                 </div>
@@ -141,9 +207,9 @@
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-comments text-rose-500 text-sm"></i>
-                        <span class="text-xs sm:text-sm font-bold text-white">Room Discussion</span>
+                        <span class="text-xs sm:text-sm font-bold text-white">Live Discussion</span>
                     </div>
-                    <span class="text-[10px] text-slate-500 font-medium">Synced</span>
+                    <span id="chatLockNotice" class="text-[10px] text-slate-500 font-medium">All Members Synced</span>
                 </div>
                 <div id="chatMessages" class="flex-1 overflow-y-auto space-y-2.5 pr-1"></div>
                 <form onsubmit="handleSendChat(event)" class="mt-3 flex gap-2">
@@ -164,12 +230,15 @@
 
     <script>
         /*************************************************************
-         * ENTERPRISE REAL-TIME ENGINE (WITH BACKGROUND AUTO-RESUME)
+         * REAL-TIME ENGINE (MQTT + EMOJIS + SOUNDS + FULLSCREEN)
          *************************************************************/
         const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
         let mqttClient = null;
         let isHost = false;
         let currentRoomId = null;
+
+        let myNickname = localStorage.getItem('wt_my_name') || 'Guest';
+        let isHostOnlyControl = false;
 
         let currentMediaType = 'youtube';
         let currentMediaSource = null;
@@ -177,6 +246,9 @@
         let ytPlayer = null;
         let isInternalSync = false;
         let lastReportedTime = 0;
+
+        const nameColors = ['text-rose-400', 'text-sky-400', 'text-amber-400', 'text-emerald-400', 'text-purple-400', 'text-pink-400'];
+        const myColor = nameColors[Math.floor(Math.random() * nameColors.length)];
 
         function updateConnStatus(text, status) {
             const badge = document.getElementById('connStatusBadge');
@@ -195,22 +267,30 @@
             }
         }
 
+        function promptChangeName() {
+            const newName = prompt("Enter your name for the room:", myNickname);
+            if(newName && newName.trim()) {
+                myNickname = newName.trim().substring(0, 15);
+                localStorage.setItem('wt_my_name', myNickname);
+                document.getElementById('topUsernameDisplay').innerText = myNickname;
+            }
+        }
+
         function getYouTubeId(url) {
             if(!url) return null;
             const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        // Connect to High-Speed Global Cluster with keepalive for mobile
         function connectRealtimeNetwork(roomId) {
             updateConnStatus("Connecting...", "connecting");
 
             mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
                 clientId: myClientId,
                 clean: true,
-                keepalive: 30, // Pings every 30s to keep mobile connection alive
+                keepalive: 30,
                 connectTimeout: 5000,
-                reconnectPeriod: 1000 // Fast 1s reconnect
+                reconnectPeriod: 1000
             });
 
             const topic = 'watchroom/room_' + roomId;
@@ -230,29 +310,20 @@
                     if(data.senderId === myClientId) return;
                     handleIncomingSignal(data);
                 } catch(e) {
-                    console.error("Message error:", e);
+                    console.error("Signal error:", e);
                 }
             });
 
             mqttClient.on('error', () => {
-                if(document.visibilityState === 'visible') {
-                    updateConnStatus("Reconnecting...", "connecting");
-                }
+                if(document.visibilityState === 'visible') updateConnStatus("Reconnecting...", "connecting");
             });
-
             mqttClient.on('offline', () => {
-                if(document.visibilityState === 'visible') {
-                    updateConnStatus("Reconnecting...", "connecting");
-                }
+                if(document.visibilityState === 'visible') updateConnStatus("Reconnecting...", "connecting");
             });
         }
 
-        /*************************************************************
-         * AUTO-RECOVERY ON TAB RESUME (WHATSAPP SE WAPAS AANE PAR)
-         *************************************************************/
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && currentRoomId) {
-                // User returned to Chrome from WhatsApp
                 if (!mqttClient || !mqttClient.connected) {
                     updateConnStatus("Reconnecting...", "connecting");
                     try {
@@ -265,9 +336,7 @@
                     updateConnStatus("Active", "connected");
                     const topic = 'watchroom/room_' + currentRoomId;
                     mqttClient.subscribe(topic);
-                    if (!isHost) {
-                        sendRealtimeSignal({ type: 'REQUEST_SYNC' });
-                    }
+                    if (!isHost) sendRealtimeSignal({ type: 'REQUEST_SYNC' });
                 }
             }
         });
@@ -289,7 +358,16 @@
         // Host creates room
         function handleCreateWatchRoom() {
             const urlInput = document.getElementById('videoUrlInput').value.trim();
+            const nameInput = document.getElementById('setupUsernameInput').value.trim();
+
             if(!urlInput) return alert("Please paste a video URL first!");
+            if(nameInput) {
+                myNickname = nameInput.substring(0, 15);
+                localStorage.setItem('wt_my_name', myNickname);
+            } else {
+                myNickname = "Host";
+            }
+            document.getElementById('topUsernameDisplay').innerText = myNickname;
 
             isHost = true;
             currentMediaSource = urlInput;
@@ -320,11 +398,14 @@
             joinRoomDirectly(key, vUrl, vType);
         }
 
-        // Guest joins directly from URL link
         function joinRoomDirectly(targetRoomId, videoUrl, videoType) {
             isHost = false;
             currentRoomId = targetRoomId;
             document.getElementById('displayKey').innerText = targetRoomId;
+
+            const savedName = localStorage.getItem('wt_my_name');
+            myNickname = savedName || "Guest_" + Math.floor(100 + Math.random() * 900);
+            document.getElementById('topUsernameDisplay').innerText = myNickname;
 
             showTheaterScreen(false);
 
@@ -339,8 +420,24 @@
         }
 
         function handleIncomingSignal(data) {
+            if(data.type === 'EMOJI_REACTION') {
+                displayFloatingEmoji(data.emoji);
+                return;
+            }
+
+            if(data.type === 'MEME_SOUND') {
+                playSynthesizedSound(data.sound);
+                return;
+            }
+
+            if(data.type === 'HOST_LOCK_UPDATE') {
+                isHostOnlyControl = data.isLocked;
+                applyHostLockUI(data.isLocked);
+                return;
+            }
+
             if(data.type === 'CHAT_MSG') {
-                appendChatMessage({ sender: data.sender, text: data.text, time: data.time, isMe: false });
+                appendChatMessage({ sender: data.sender, text: data.text, time: data.time, color: data.color, isMe: false });
                 return;
             }
 
@@ -351,7 +448,8 @@
                     mediaSource: currentMediaSource,
                     time: getCurrentTime(),
                     isPlaying: isPlayerPlaying(),
-                    speed: getCurrentSpeed()
+                    speed: getCurrentSpeed(),
+                    isLocked: isHostOnlyControl
                 });
                 return;
             }
@@ -361,6 +459,8 @@
             if(data.type === 'INIT_STATE') {
                 currentMediaType = data.mediaType;
                 currentMediaSource = data.mediaSource;
+                isHostOnlyControl = !!data.isLocked;
+                applyHostLockUI(isHostOnlyControl);
 
                 setupPlayer(data.mediaSource, () => {
                     seekToTime(data.time);
@@ -384,6 +484,159 @@
             setTimeout(() => { isInternalSync = false; }, 600);
         }
 
+        // Live Emojis
+        function sendEmojiReaction(emoji) {
+            displayFloatingEmoji(emoji);
+            sendRealtimeSignal({ type: 'EMOJI_REACTION', emoji: emoji });
+        }
+
+        function displayFloatingEmoji(emoji) {
+            const area = document.getElementById('emojiOverlayArea');
+            if(!area) return;
+
+            const el = document.createElement('div');
+            el.className = 'floating-emoji';
+            el.innerText = emoji;
+
+            const randomLeft = Math.floor(15 + Math.random() * 70);
+            el.style.left = randomLeft + '%';
+
+            area.appendChild(el);
+            setTimeout(() => el.remove(), 2200);
+        }
+
+        // Meme Sounds (Instant Audio Synthesis - No external downloads)
+        function triggerMemeSound(type) {
+            playSynthesizedSound(type);
+            sendRealtimeSignal({ type: 'MEME_SOUND', sound: type });
+        }
+
+        function playSynthesizedSound(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const now = ctx.currentTime;
+
+                if (type === 'horn') {
+                    [440, 554, 659].forEach((f) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(f, now);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.4);
+                    });
+                } else if (type === 'laugh') {
+                    for(let i=0; i<4; i++) {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(600 + i*50, now + i*0.1);
+                        gain.gain.setValueAtTime(0.15, now + i*0.1);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + i*0.1 + 0.08);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + i*0.1);
+                        osc.stop(now + i*0.1 + 0.08);
+                    }
+                } else if (type === 'bruh') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(140, now);
+                    osc.frequency.exponentialRampToValueAtTime(70, now + 0.5);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                } else if (type === 'boing') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(900, now + 0.3);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+            } catch(e) {
+                console.warn("Audio Context blocked:", e);
+            }
+        }
+
+        // Host Control Lock
+        function toggleHostControlLock() {
+            if(!isHost) return;
+            isHostOnlyControl = !isHostOnlyControl;
+            applyHostLockUI(isHostOnlyControl);
+            sendRealtimeSignal({ type: 'HOST_LOCK_UPDATE', isLocked: isHostOnlyControl });
+        }
+
+        function applyHostLockUI(locked) {
+            const lockIcon = document.getElementById('lockIcon');
+            const lockText = document.getElementById('lockText');
+            const chatNotice = document.getElementById('chatLockNotice');
+            const btnSeekBack = document.getElementById('btnSeekBack');
+            const btnSeekForward = document.getElementById('btnSeekForward');
+            const togglePlayBtn = document.getElementById('togglePlayBtn');
+            const speedSelect = document.getElementById('speedSelect');
+
+            if(locked) {
+                if(lockIcon) lockIcon.className = "fa-solid fa-lock text-rose-500";
+                if(lockText) lockText.innerText = "Host Only";
+                if(chatNotice) chatNotice.innerText = "🔒 Host Controls Only";
+
+                if(!isHost) {
+                    btnSeekBack.disabled = true;
+                    btnSeekForward.disabled = true;
+                    togglePlayBtn.disabled = true;
+                    speedSelect.disabled = true;
+                    document.getElementById('controlsContainerBar').classList.add('opacity-50');
+                }
+            } else {
+                if(lockIcon) lockIcon.className = "fa-solid fa-lock-open text-emerald-400";
+                if(lockText) lockText.innerText = "All Control";
+                if(chatNotice) chatNotice.innerText = "All Members Synced";
+
+                btnSeekBack.disabled = false;
+                btnSeekForward.disabled = false;
+                togglePlayBtn.disabled = false;
+                speedSelect.disabled = false;
+                document.getElementById('controlsContainerBar').classList.remove('opacity-50');
+            }
+        }
+
+        // Fullscreen Toggle
+        function toggleFullscreen() {
+            const box = document.getElementById('videoContainerBox');
+            const icon = document.getElementById('fullscreenIcon');
+
+            if (!document.fullscreenElement) {
+                if (box.requestFullscreen) box.requestFullscreen();
+                else if (box.webkitRequestFullscreen) box.webkitRequestFullscreen();
+                icon.className = "fa-solid fa-compress text-xs";
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+                icon.className = "fa-solid fa-expand text-xs";
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            const icon = document.getElementById('fullscreenIcon');
+            if (!document.fullscreenElement) {
+                icon.className = "fa-solid fa-expand text-xs";
+            }
+        });
+
+        // Player Core
         function setupPlayer(url, callback) {
             const ytId = getYouTubeId(url);
             const nativeVideo = document.getElementById('nativePlayer');
@@ -466,6 +719,7 @@
         }, 500);
 
         function userTogglePlay() {
+            if(!isHost && isHostOnlyControl) return;
             const playing = isPlayerPlaying();
             const time = getCurrentTime();
             if(playing) {
@@ -478,12 +732,14 @@
         }
 
         function userSeekDelta(delta) {
+            if(!isHost && isHostOnlyControl) return;
             const newTime = Math.max(0, getCurrentTime() + delta);
             seekToTime(newTime);
             sendRealtimeSignal({ type: 'SEEK', time: newTime });
         }
 
         function userChangeSpeed(val) {
+            if(!isHost && isHostOnlyControl) return;
             const rate = parseFloat(val);
             setPlaybackRate(rate);
             sendRealtimeSignal({ type: 'RATE', rate: rate });
@@ -552,7 +808,7 @@
             sendRealtimeSignal({ type: 'REQUEST_SYNC' });
         }
 
-        // Live Chat
+        // Live Chat with Personal Nicknames & Colors
         function handleSendChat(e) {
             e.preventDefault();
             const input = document.getElementById('chatInput');
@@ -560,10 +816,9 @@
             if(!text) return;
 
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const senderRole = isHost ? 'Host' : 'Friend';
-            appendChatMessage({ sender: senderRole, text: text, time: timeStr, isMe: true });
+            appendChatMessage({ sender: myNickname, text: text, time: timeStr, color: myColor, isMe: true });
 
-            sendRealtimeSignal({ type: 'CHAT_MSG', sender: senderRole, text: text, time: timeStr });
+            sendRealtimeSignal({ type: 'CHAT_MSG', sender: myNickname, text: text, time: timeStr, color: myColor });
             input.value = '';
         }
 
@@ -579,7 +834,7 @@
             bubble.innerText = data.text;
 
             const meta = document.createElement('div');
-            meta.className = 'text-[9px] text-slate-500 mt-1 px-1';
+            meta.className = `text-[9px] mt-1 px-1 font-semibold ${data.color || 'text-slate-400'}`;
             meta.innerText = `${data.sender} • ${data.time}`;
 
             row.appendChild(bubble);
@@ -591,16 +846,19 @@
         function showTheaterScreen(isHostRole) {
             document.getElementById('setupScreen').classList.add('hidden');
             document.getElementById('theaterScreen').classList.remove('hidden');
-            document.getElementById('roomMemberBadge').classList.remove('hidden');
 
             const badge = document.getElementById('roleBadge');
             badge.innerText = isHostRole ? "Host" : "Guest";
             badge.className = isHostRole 
                 ? "text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30"
                 : "text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30";
+
+            if(isHostRole) {
+                document.getElementById('hostControlToggleBtn').classList.remove('hidden');
+                document.getElementById('hostControlToggleBtn').classList.add('flex');
+            }
         }
 
-        // Native Mobile Share (Direct WhatsApp) + Fallback to Copy
         function shareOrCopyLink() {
             if(currentRoomId && currentMediaSource) {
                 const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}&v=${encodeURIComponent(currentMediaSource)}&type=${currentMediaType}`;
@@ -608,12 +866,12 @@
                 if (navigator.share) {
                     navigator.share({
                         title: 'Join my WatchRoom',
-                        text: 'Watch this video with me in sync!',
+                        text: 'Watch this movie with me in sync!',
                         url: url
                     }).catch(() => {});
                 } else {
                     navigator.clipboard.writeText(url).then(() => {
-                        alert("Watch Room link copied! Share with friends on WhatsApp.");
+                        alert("Room link copied! Share with friends.");
                     });
                 }
             }
