@@ -11,8 +11,8 @@
     <!-- MQTT Real-time Engine -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        #chatMessages::-webkit-scrollbar, #searchResultsList::-webkit-scrollbar, #queueList::-webkit-scrollbar { width: 4px; }
-        #chatMessages::-webkit-scrollbar-thumb, #searchResultsList::-webkit-scrollbar-thumb, #queueList::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        #chatMessages::-webkit-scrollbar, #suggestionsBox::-webkit-scrollbar, #queueList::-webkit-scrollbar { width: 4px; }
+        #chatMessages::-webkit-scrollbar-thumb, #suggestionsBox::-webkit-scrollbar-thumb, #queueList::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         
         @keyframes floatUp {
             0% { transform: translateY(0) scale(0.8); opacity: 1; }
@@ -67,11 +67,11 @@
     <!-- Main Container -->
     <main class="flex-1 flex flex-col items-center justify-center p-2 sm:p-6 w-full max-w-4xl mx-auto">
         
-        <!-- 1. SETUP & IN-APP SEARCH LAUNCHER SCREEN -->
+        <!-- 1. SETUP & SMART SEARCH SCREEN -->
         <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-5 my-auto">
             <div class="text-center space-y-1">
                 <h2 class="text-xl font-black text-white">Create a Watch Room</h2>
-                <p class="text-xs text-slate-400">Search videos directly or paste any link</p>
+                <p class="text-xs text-slate-400">Search with suggestions or paste any video link</p>
             </div>
 
             <!-- Nickname -->
@@ -81,43 +81,33 @@
                        class="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white font-medium">
             </div>
 
-            <!-- Method Switcher Tabs -->
-            <div class="flex border-b border-slate-800 text-xs font-bold">
-                <button onclick="switchSearchTab('search')" id="tabSearchBtn" class="flex-1 pb-2.5 text-rose-500 border-b-2 border-rose-500 transition cursor-pointer flex items-center justify-center gap-1.5">
-                    <i class="fa-solid fa-magnifying-glass"></i> In-App Search
-                </button>
-                <button onclick="switchSearchTab('url')" id="tabUrlBtn" class="flex-1 pb-2.5 text-slate-400 border-b-2 border-transparent transition cursor-pointer flex items-center justify-center gap-1.5">
-                    <i class="fa-solid fa-link"></i> Direct Link
-                </button>
-            </div>
-
-            <!-- TAB 1: IN-APP YOUTUBE SEARCH -->
-            <div id="inAppSearchContainer" class="space-y-3 relative">
+            <!-- SMART YOUTUBE SEARCH BOX WITH LIVE SUGGESTIONS -->
+            <div class="space-y-2 relative">
+                <label class="block text-xs font-semibold text-slate-400">Search Movie or Drama on YouTube:</label>
                 <div class="flex gap-2">
-                    <input type="text" id="inAppSearchInput" oninput="handleSearchTyping(this.value)" onkeyup="if(event.key==='Enter') executeInAppSearch()" placeholder="Search movie, drama, song..." 
+                    <input type="text" id="inAppSearchInput" oninput="handleSearchTyping(this.value)" onkeyup="if(event.key==='Enter') executeSmartSearch()" placeholder="Type movie name (e.g. Diljale movie)..." 
                            class="flex-1 p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
-                    <button onclick="executeInAppSearch()" class="px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-rose-600/30 cursor-pointer">
-                        <i class="fa-solid fa-search"></i>
+                    <button onclick="executeSmartSearch()" class="px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-rose-600/30 flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-brands fa-youtube text-base"></i> <span>Find</span>
                     </button>
                 </div>
 
-                <!-- Google Live Autocomplete Suggestions Box -->
-                <div id="suggestionsBox" class="hidden absolute top-12 left-0 right-14 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden text-xs"></div>
-
-                <!-- Search Results List -->
-                <div id="searchResultsList" class="max-h-60 overflow-y-auto space-y-2 pr-1">
-                    <div class="text-center text-xs text-slate-500 py-6">
-                        🔍 Search anything above to launch a room with 1 tap!
-                    </div>
-                </div>
+                <!-- Google Live Autocomplete Suggestions Dropdown -->
+                <div id="suggestionsBox" class="hidden absolute top-16 left-0 right-14 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden text-xs max-h-48 overflow-y-auto"></div>
             </div>
 
-            <!-- TAB 2: MANUAL URL INPUT -->
-            <div id="manualUrlContainer" class="space-y-3 hidden">
-                <input type="text" id="videoUrlInput" placeholder="Paste YouTube or MP4 link here..." 
-                       class="w-full p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
-                <button onclick="handleCreateFromManualUrl()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-xs transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer">
-                    <i class="fa-solid fa-play"></i> Launch Room from Link
+            <!-- DIRECT LINK & CLIPBOARD AUTO-PASTE CARD -->
+            <div class="space-y-2 pt-2 border-t border-slate-800/80">
+                <div class="flex justify-between items-center text-xs font-semibold text-slate-400">
+                    <span>Or Paste Video Link:</span>
+                    <button onclick="autoPasteFromClipboard()" class="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-[11px] font-bold cursor-pointer">
+                        <i class="fa-regular fa-paste"></i> Paste Copied Link
+                    </button>
+                </div>
+                <input type="text" id="videoUrlInput" placeholder="https://www.youtube.com/watch?v=..." 
+                       class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
+                <button onclick="handleCreateWatchRoom()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-xs transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95">
+                    <i class="fa-solid fa-play"></i> Launch Room & Copy Invite Link
                 </button>
             </div>
 
@@ -145,12 +135,10 @@
                 </div>
 
                 <div class="flex items-center gap-1.5 sm:gap-2">
-                    <!-- Host Only Lock Toggle -->
                     <button id="hostControlToggleBtn" onclick="toggleHostControlLock()" class="hidden px-2.5 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-700 text-slate-300 transition items-center gap-1.5 cursor-pointer">
                         <i id="lockIcon" class="fa-solid fa-lock-open text-emerald-400"></i> <span id="lockText" class="hidden sm:inline">All Control</span>
                     </button>
 
-                    <!-- Features Hub Button -->
                     <button onclick="openFeaturesModal()" class="px-2.5 sm:px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-xs font-bold rounded-lg transition flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer">
                         <i class="fa-solid fa-toolbox"></i> <span>Tools</span>
                     </button>
@@ -173,19 +161,14 @@
                     <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
                     <video id="nativePlayer" class="w-full h-full hidden" playsinline></video>
 
-                    <!-- Laser Pointer & Drawing Canvas -->
                     <canvas id="laserCanvas" class="absolute inset-0 z-30 pointer-events-none w-full h-full"></canvas>
-
-                    <!-- Subtitles Overlay -->
                     <div id="subtitleDisplay" class="absolute bottom-6 left-4 right-4 text-center pointer-events-none z-30 text-white font-bold text-sm sm:text-base drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"></div>
-
-                    <!-- Floating Emojis Overlay -->
                     <div id="emojiOverlayArea" class="absolute inset-0 pointer-events-none overflow-hidden z-30"></div>
 
-                    <!-- Tap Catcher for Screen (Cinema Mode / Hide Controls) -->
+                    <!-- Screen Tap Catcher for Cinema Mode -->
                     <div id="screenTapCatcher" onclick="handleScreenTap(event)" onmousemove="handleLaserPointerMove(event)" class="absolute inset-0 z-20 cursor-pointer"></div>
 
-                    <!-- Floating Overlay Controls (PiP, Laser Tool, Fullscreen) -->
+                    <!-- Floating Actions (Laser, PiP, Smart Fullscreen) -->
                     <div id="inVideoOverlayControls" class="absolute top-3 right-3 z-30 flex items-center gap-1.5 transition-opacity duration-300">
                         <button id="laserToggleBtn" onclick="toggleLaserTool()" title="Laser Pointer" class="bg-black/60 hover:bg-black/90 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-white/10 backdrop-blur cursor-pointer">
                             <i class="fa-solid fa-pen-nib text-xs"></i>
@@ -198,7 +181,7 @@
                         </button>
                     </div>
 
-                    <!-- Intermission Break & Tic-Tac-Toe Overlay -->
+                    <!-- Intermission Break & Tic-Tac-Toe -->
                     <div id="intermissionOverlay" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-4 z-40 hidden space-y-3 text-center">
                         <div class="text-rose-500 font-black text-lg tracking-widest uppercase flex items-center gap-2">
                             🍿 Intermission Break
@@ -206,15 +189,15 @@
                         <p class="text-xs text-slate-400">Play Tic-Tac-Toe with friends while waiting!</p>
                         
                         <div id="tttBoard" class="grid grid-cols-3 gap-2 w-48 h-48 mx-auto my-2">
-                            <button onclick="playTicTacToeMove(0)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
-                            <button onclick="playTicTacToeMove(1)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
-                            <button onclick="playTicTacToeMove(2)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
-                            <button onclick="playTicTacToeMove(3)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
-                            <button onclick="playTicTacToeMove(4)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
-                            <button onclick="playTicTacToeMove(5)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
-                            <button onclick="playTicTacToeMove(6)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
-                            <button onclick="playTicTacToeMove(7)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
-                            <button onclick="playTicTacToeMove(8)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
+                            <button onclick="playTicTacToeMove(0)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center cursor-pointer"></button>
+                            <button onclick="playTicTacToeMove(1)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center cursor-pointer"></button>
+                            <button onclick="playTicTacToeMove(2)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center cursor-pointer"></button>
+                            <button onclick="playTicTacToeMove(3)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center cursor-pointer"></button>
+                            <button onclick="playTicTacToeMove(4)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center cursor-pointer"></button>
+                            <button onclick="playTicTacToeMove(5)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center cursor-pointer"></button>
+                            <button onclick="playTicTacToeMove(6)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center cursor-pointer"></button>
+                            <button onclick="playTicTacToeMove(7)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center cursor-pointer"></button>
+                            <button onclick="playTicTacToeMove(8)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center cursor-pointer"></button>
                         </div>
                         <div id="tttStatus" class="text-xs font-semibold text-rose-400">Next turn: X</div>
                         
@@ -223,7 +206,7 @@
                         </button>
                     </div>
 
-                    <!-- Mobile Autoplay Unlock Overlay -->
+                    <!-- Autoplay Unlock Overlay -->
                     <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-40 hidden p-4 text-center">
                         <div class="w-16 h-16 rounded-full bg-rose-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-rose-600/50 animate-bounce cursor-pointer" onclick="unlockPlayback()">
                             <i class="fa-solid fa-play ml-1"></i>
@@ -314,24 +297,14 @@
             </div>
 
             <div class="flex border-b border-slate-800 text-[11px] font-bold overflow-x-auto">
-                <button onclick="switchToolsTab('search')" id="toolTabSearch" class="flex-1 pb-2 text-rose-500 border-b-2 border-rose-500 whitespace-nowrap px-2 cursor-pointer">Search Video</button>
-                <button onclick="switchToolsTab('playlist')" id="toolTabPlaylist" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2 cursor-pointer">Queue</button>
+                <button onclick="switchToolsTab('playlist')" id="toolTabPlaylist" class="flex-1 pb-2 text-rose-500 border-b-2 border-rose-500 whitespace-nowrap px-2 cursor-pointer">Queue</button>
                 <button onclick="switchToolsTab('poll')" id="toolTabPoll" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2 cursor-pointer">Poll</button>
                 <button onclick="switchToolsTab('audio')" id="toolTabAudio" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2 cursor-pointer">Audio & Ambient</button>
                 <button onclick="switchToolsTab('filters')" id="toolTabFilters" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2 cursor-pointer">Filters</button>
             </div>
 
-            <!-- Search Inside Room -->
-            <div id="toolSecSearch" class="space-y-3">
-                <div class="flex gap-2">
-                    <input type="text" id="insideSearchInput" placeholder="Search new YouTube video..." class="flex-1 p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                    <button onclick="executeInsideSearch()" class="px-3.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg text-white cursor-pointer">Search</button>
-                </div>
-                <div id="insideSearchResults" class="max-h-48 overflow-y-auto space-y-2 pr-1"></div>
-            </div>
-
             <!-- Queue -->
-            <div id="toolSecPlaylist" class="space-y-3 hidden">
+            <div id="toolSecPlaylist" class="space-y-3">
                 <div class="flex gap-2">
                     <input type="text" id="queueVideoInput" placeholder="Add next video URL..." class="flex-1 p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
                     <button onclick="addToPlaylistQueue()" class="px-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-xs font-bold text-white cursor-pointer">Add</button>
@@ -538,28 +511,8 @@
         }
 
         /*************************************************************
-         * 2. FAST IN-APP YOUTUBE SEARCH & AUTOCOMPLETE (CORS FIXED)
+         * 2. SMART SEARCH & CLIPBOARD AUTO-PASTE ENGINE
          *************************************************************/
-        function switchSearchTab(tab) {
-            const searchContainer = document.getElementById('inAppSearchContainer');
-            const urlContainer = document.getElementById('manualUrlContainer');
-            const tabSearch = document.getElementById('tabSearchBtn');
-            const tabUrl = document.getElementById('tabUrlBtn');
-
-            if(tab === 'search') {
-                searchContainer.classList.remove('hidden');
-                urlContainer.classList.add('hidden');
-                tabSearch.className = "flex-1 pb-2.5 text-rose-500 border-b-2 border-rose-500 transition cursor-pointer flex items-center justify-center gap-1.5";
-                tabUrl.className = "flex-1 pb-2.5 text-slate-400 border-b-2 border-transparent transition cursor-pointer flex items-center justify-center gap-1.5";
-            } else {
-                urlContainer.classList.remove('hidden');
-                searchContainer.classList.add('hidden');
-                tabUrl.className = "flex-1 pb-2.5 text-rose-500 border-b-2 border-rose-500 transition cursor-pointer flex items-center justify-center gap-1.5";
-                tabSearch.className = "flex-1 pb-2.5 text-slate-400 border-b-2 border-transparent transition cursor-pointer flex items-center justify-center gap-1.5";
-            }
-        }
-
-        // Live Google YouTube Autocomplete Suggestions via JSONP (No CORS Issues)
         let suggestTimeout = null;
         function handleSearchTyping(val) {
             clearTimeout(suggestTimeout);
@@ -571,7 +524,7 @@
                 script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(val)}&callback=renderSearchSuggestions`;
                 document.body.appendChild(script);
                 script.onload = () => script.remove();
-            }, 250);
+            }, 200);
         }
 
         window.renderSearchSuggestions = function(data) {
@@ -579,139 +532,54 @@
             if(!data || !data[1] || data[1].length === 0) { box.classList.add('hidden'); return; }
 
             box.innerHTML = '';
-            data[1].slice(0, 5).forEach(item => {
+            data[1].slice(0, 6).forEach(item => {
                 const row = document.createElement('div');
-                row.className = "p-2 hover:bg-slate-700 cursor-pointer text-slate-200 border-b border-slate-700/50 flex items-center gap-2";
-                row.innerHTML = `<i class="fa-solid fa-magnifying-glass text-slate-400 text-[10px]"></i> <span>${item[0]}</span>`;
+                row.className = "p-2.5 hover:bg-slate-700 cursor-pointer text-slate-200 border-b border-slate-700/50 flex items-center justify-between";
+                row.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass text-slate-400 text-[10px]"></i>
+                        <span>${item[0]}</span>
+                    </div>
+                    <span class="text-[10px] text-rose-400 font-bold">Search ➔</span>
+                `;
                 row.onclick = () => {
                     document.getElementById('inAppSearchInput').value = item[0];
                     box.classList.add('hidden');
-                    executeInAppSearch();
+                    executeSmartSearch();
                 };
                 box.appendChild(row);
             });
             box.classList.remove('hidden');
         };
 
-        // Piped Open CORS API Mirrors
-        async function fetchYouTubeVideos(query) {
-            const endpoints = [
-                `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=videos`,
-                `https://pipedapi.adminforge.de/search?q=${encodeURIComponent(query)}&filter=videos`,
-                `https://api.piped.yt/search?q=${encodeURIComponent(query)}&filter=videos`,
-                `https://api.allorigins.win/raw?url=${encodeURIComponent('https://pipedapi.kavin.rocks/search?q=' + query + '&filter=videos')}`
-            ];
-
-            for (let url of endpoints) {
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 4000);
-                    const res = await fetch(url, { signal: controller.signal });
-                    clearTimeout(timeoutId);
-
-                    if (res.ok) {
-                        const data = await res.json();
-                        const items = data.items || data;
-                        if (Array.isArray(items) && items.length > 0) {
-                            return items.filter(i => i.type === 'stream' || (i.url && i.url.includes('/watch?v='))).map(i => ({
-                                title: i.title,
-                                author: i.uploaderName || i.uploader || "YouTube",
-                                videoId: i.url.replace('/watch?v=', '').split('&')[0],
-                                thumbnail: i.thumbnail || `https://i.ytimg.com/vi/${i.url.replace('/watch?v=', '').split('&')[0]}/hqdefault.jpg`
-                            }));
-                        }
-                    }
-                } catch(e) {
-                    console.warn("API mirror skipped, trying next...");
-                }
-            }
-            return null;
-        }
-
-        async function executeInAppSearch() {
+        // 1-Tap Direct Search on YouTube App/Web
+        function executeSmartSearch() {
             document.getElementById('suggestionsBox').classList.add('hidden');
-            const input = document.getElementById('inAppSearchInput');
-            const query = input.value.trim();
-            const list = document.getElementById('searchResultsList');
-
-            if(!query) return;
-            list.innerHTML = `<div class="text-center py-6 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Searching YouTube...</div>`;
-
-            const results = await fetchYouTubeVideos(query);
-
-            if(!results || results.length === 0) {
-                list.innerHTML = `
-                    <div class="p-4 text-center text-xs text-amber-400 bg-amber-500/10 rounded-xl border border-amber-500/20 space-y-1">
-                        <div>Search took too long or timed out.</div>
-                        <div class="text-slate-400 text-[11px]">You can paste the direct video link in the "Direct Link" tab!</div>
-                    </div>
-                `;
-                return;
-            }
-
-            list.innerHTML = '';
-            results.slice(0, 8).forEach(v => {
-                const item = document.createElement('div');
-                item.className = "p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 flex items-center gap-2.5 cursor-pointer transition active:scale-98";
-                item.onclick = () => launchRoomWithVideoId(v.videoId);
-
-                item.innerHTML = `
-                    <img src="${v.thumbnail}" class="w-20 aspect-video rounded-lg object-cover bg-black shrink-0">
-                    <div class="flex-1 min-w-0">
-                        <div class="text-xs font-bold text-white line-clamp-1">${v.title}</div>
-                        <div class="text-[10px] text-slate-400 mt-0.5 truncate">${v.author}</div>
-                    </div>
-                    <button class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shrink-0">
-                        <i class="fa-solid fa-play"></i>
-                    </button>
-                `;
-                list.appendChild(item);
-            });
-        }
-
-        function launchRoomWithVideoId(videoId) {
-            const fullUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            document.getElementById('videoUrlInput').value = fullUrl;
-            handleCreateWatchRoom();
-        }
-
-        function handleCreateFromManualUrl() {
-            handleCreateWatchRoom();
-        }
-
-        // Inside Room Search
-        async function executeInsideSearch() {
-            const q = document.getElementById('insideSearchInput').value.trim();
-            const list = document.getElementById('insideSearchResults');
+            const q = document.getElementById('inAppSearchInput').value.trim();
             if(!q) return;
 
-            list.innerHTML = `<div class="text-center py-4 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin text-rose-500"></i> Searching...</div>`;
-            const results = await fetchYouTubeVideos(q);
-
-            if(!results) {
-                list.innerHTML = `<div class="text-center py-4 text-xs text-rose-400">Search busy. Paste link instead!</div>`;
-                return;
-            }
-
-            list.innerHTML = '';
-            results.slice(0, 5).forEach(v => {
-                const el = document.createElement('div');
-                el.className = "p-2 bg-slate-800 rounded-lg flex items-center justify-between gap-2 text-xs";
-                el.innerHTML = `
-                    <span class="truncate flex-1 font-semibold">${v.title}</span>
-                    <button onclick="switchVideoDirectly('${v.videoId}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold rounded cursor-pointer">Play</button>
-                `;
-                list.appendChild(el);
-            });
+            // Direct YouTube Search Link
+            const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+            window.open(ytSearchUrl, '_blank');
         }
 
-        function switchVideoDirectly(videoId) {
-            const url = `https://www.youtube.com/watch?v=${videoId}`;
-            currentMediaSource = url;
-            currentMediaType = 'youtube';
-            setupPlayer(url);
-            sendRealtimeSignal({ type: 'SWITCH_VIDEO', url: url });
-            closeFeaturesModal();
+        // Auto paste from clipboard in 1 click
+        async function autoPasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if(text && text.trim()) {
+                    document.getElementById('videoUrlInput').value = text.trim();
+                    handleCreateWatchRoom();
+                } else {
+                    alert("Please copy a YouTube link first!");
+                }
+            } catch(e) {
+                const manual = prompt("Paste your video link here:");
+                if(manual) {
+                    document.getElementById('videoUrlInput').value = manual.trim();
+                    handleCreateWatchRoom();
+                }
+            }
         }
 
         /*************************************************************
@@ -721,7 +589,7 @@
             const urlInput = document.getElementById('videoUrlInput').value.trim();
             const nameInput = document.getElementById('setupUsernameInput').value.trim();
 
-            if(!urlInput) return alert("Please select or paste a video first!");
+            if(!urlInput) return alert("Please paste a video link or copy one from YouTube!");
             if(nameInput) {
                 myNickname = nameInput.substring(0, 15);
                 localStorage.setItem('wt_my_name', myNickname);
@@ -897,7 +765,7 @@
         }
 
         /*************************************************************
-         * 5. SMART FULLSCREEN & SCREEN TAP AUTO-HIDE
+         * 5. SMART FULLSCREEN & SCREEN TAP CINEMA MODE
          *************************************************************/
         async function toggleSmartFullscreen() {
             const box = document.getElementById('videoContainerBox');
@@ -957,7 +825,7 @@
         }
 
         /*************************************************************
-         * 6. LASER POINTER & LIVE SCREEN DRAWING
+         * 6. LASER POINTER ON SCREEN
          *************************************************************/
         function toggleLaserTool() {
             isLaserActive = !isLaserActive;
@@ -1041,14 +909,14 @@
             const cells = document.querySelectorAll('.ttt-cell');
             cells.forEach((cell, i) => {
                 cell.innerText = tttState[i];
-                if(tttState[i] === "X") cell.className = "ttt-cell bg-slate-800 text-rose-500 font-black text-xl rounded-xl flex items-center justify-center";
-                else if(tttState[i] === "O") cell.className = "ttt-cell bg-slate-800 text-sky-400 font-black text-xl rounded-xl flex items-center justify-center";
+                if(tttState[i] === "X") cell.className = "ttt-cell bg-slate-800 text-rose-500 font-black text-xl rounded-xl flex items-center justify-center cursor-pointer";
+                else if(tttState[i] === "O") cell.className = "ttt-cell bg-slate-800 text-sky-400 font-black text-xl rounded-xl flex items-center justify-center cursor-pointer";
             });
             document.getElementById('tttStatus').innerText = `Next turn: ${tttTurn}`;
         }
 
         /*************************************************************
-         * 8. 300% VOLUME BOOSTER, AMBIENT SOUNDS & RESUME
+         * 8. 300% VOLUME BOOSTER & AMBIENT CINEMA SOUNDS
          *************************************************************/
         function changeVolumeBoost(val) {
             document.getElementById('volBoostDisplay').innerText = val + '%';
@@ -1209,7 +1077,7 @@
         }
 
         function switchToolsTab(tab) {
-            ['Search', 'Playlist', 'Poll', 'Audio', 'Filters'].forEach(t => {
+            ['Playlist', 'Poll', 'Audio', 'Filters'].forEach(t => {
                 const sec = document.getElementById('toolSec' + t);
                 const tabBtn = document.getElementById('toolTab' + t);
                 sec.classList.add('hidden');
