@@ -8,8 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PeerJS -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- MQTT Engine -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         #chatMessages::-webkit-scrollbar { width: 4px; }
         #chatMessages::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -27,10 +27,10 @@
         <div class="flex items-center gap-2">
             <div id="connStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span id="connStatusText">Ready</span>
+                <span id="connStatusText">Active</span>
             </div>
             <div id="roomMemberBadge" class="hidden flex items-center gap-1.5 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 text-xs font-bold text-slate-300">
-                <span id="memberCountText">👥 1/6</span>
+                <span id="memberCountText">👥 Live Room</span>
             </div>
         </div>
     </header>
@@ -38,12 +38,12 @@
     <!-- Main Container -->
     <main class="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full max-w-4xl mx-auto">
         
-        <!-- 1. SETUP / ROOM CREATOR SCREEN -->
+        <!-- 1. SETUP SCREEN -->
         <div id="setupScreen" class="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
             
             <div class="text-center space-y-1">
                 <h2 class="text-lg font-black text-white">Create a Watch Room</h2>
-                <p class="text-xs text-slate-400">Watch together with up to 6 friends</p>
+                <p class="text-xs text-slate-400">Watch synchronized videos with up to 6 friends</p>
             </div>
 
             <!-- Video Link Input -->
@@ -55,7 +55,7 @@
 
             <!-- Create Room Button -->
             <button id="createRoomBtn" onclick="handleCreateWatchRoom()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 font-bold rounded-xl text-sm transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 active:scale-95 cursor-pointer">
-                <i class="fa-solid fa-play"></i> Create Room & Copy Invite Link
+                <i class="fa-solid fa-play"></i> Create Room & Share Link
             </button>
 
             <!-- Manual Room Code Box -->
@@ -78,13 +78,13 @@
                     <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">Host</span>
                     <div>
                         <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Room Code</div>
-                        <div id="displayKey" class="text-xs font-mono font-bold text-slate-200">Generating...</div>
+                        <div id="displayKey" class="text-xs font-mono font-bold text-slate-200">Loading...</div>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button onclick="copyFullLink()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">
-                        <i class="fa-solid fa-share-nodes"></i> Share Link (Max 6)
+                    <button onclick="shareOrCopyLink()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">
+                        <i class="fa-solid fa-share-nodes"></i> Share Link
                     </button>
                     <button onclick="leaveRoom()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 transition cursor-pointer">
                         Exit
@@ -141,7 +141,7 @@
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-comments text-rose-500 text-sm"></i>
-                        <span class="text-xs sm:text-sm font-bold text-white">Room Discussion (Up to 6 friends)</span>
+                        <span class="text-xs sm:text-sm font-bold text-white">Room Discussion</span>
                     </div>
                     <span class="text-[10px] text-slate-500 font-medium">Synced</span>
                 </div>
@@ -163,13 +163,13 @@
     <script src="https://www.youtube.com/iframe_api"></script>
 
     <script>
-        const MAX_PEERS = 5;
-        let peer = null;
+        /*************************************************************
+         * ENTERPRISE REAL-TIME ENGINE (WITH BACKGROUND AUTO-RESUME)
+         *************************************************************/
+        const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
+        let mqttClient = null;
         let isHost = false;
         let currentRoomId = null;
-
-        let guestConnections = [];
-        let hostConnection = null;
 
         let currentMediaType = 'youtube';
         let currentMediaSource = null;
@@ -201,7 +201,92 @@
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        // Host creates room (INSTANT, NEVER FREEZES)
+        // Connect to High-Speed Global Cluster with keepalive for mobile
+        function connectRealtimeNetwork(roomId) {
+            updateConnStatus("Connecting...", "connecting");
+
+            mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+                clientId: myClientId,
+                clean: true,
+                keepalive: 30, // Pings every 30s to keep mobile connection alive
+                connectTimeout: 5000,
+                reconnectPeriod: 1000 // Fast 1s reconnect
+            });
+
+            const topic = 'watchroom/room_' + roomId;
+
+            mqttClient.on('connect', () => {
+                updateConnStatus("Active", "connected");
+                mqttClient.subscribe(topic, (err) => {
+                    if(!err && !isHost) {
+                        sendRealtimeSignal({ type: 'REQUEST_SYNC' });
+                    }
+                });
+            });
+
+            mqttClient.on('message', (t, payload) => {
+                try {
+                    const data = JSON.parse(payload.toString());
+                    if(data.senderId === myClientId) return;
+                    handleIncomingSignal(data);
+                } catch(e) {
+                    console.error("Message error:", e);
+                }
+            });
+
+            mqttClient.on('error', () => {
+                if(document.visibilityState === 'visible') {
+                    updateConnStatus("Reconnecting...", "connecting");
+                }
+            });
+
+            mqttClient.on('offline', () => {
+                if(document.visibilityState === 'visible') {
+                    updateConnStatus("Reconnecting...", "connecting");
+                }
+            });
+        }
+
+        /*************************************************************
+         * AUTO-RECOVERY ON TAB RESUME (WHATSAPP SE WAPAS AANE PAR)
+         *************************************************************/
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && currentRoomId) {
+                // User returned to Chrome from WhatsApp
+                if (!mqttClient || !mqttClient.connected) {
+                    updateConnStatus("Reconnecting...", "connecting");
+                    try {
+                        if (mqttClient) mqttClient.reconnect();
+                        else connectRealtimeNetwork(currentRoomId);
+                    } catch(e) {
+                        connectRealtimeNetwork(currentRoomId);
+                    }
+                } else {
+                    updateConnStatus("Active", "connected");
+                    const topic = 'watchroom/room_' + currentRoomId;
+                    mqttClient.subscribe(topic);
+                    if (!isHost) {
+                        sendRealtimeSignal({ type: 'REQUEST_SYNC' });
+                    }
+                }
+            }
+        });
+
+        window.addEventListener('focus', () => {
+            if (currentRoomId && mqttClient && !mqttClient.connected) {
+                mqttClient.reconnect();
+            }
+        });
+
+        function sendRealtimeSignal(data) {
+            if(mqttClient && mqttClient.connected && currentRoomId) {
+                data.senderId = myClientId;
+                const topic = 'watchroom/room_' + currentRoomId;
+                mqttClient.publish(topic, JSON.stringify(data));
+            }
+        }
+
+        // Host creates room
         function handleCreateWatchRoom() {
             const urlInput = document.getElementById('videoUrlInput').value.trim();
             if(!urlInput) return alert("Please paste a video URL first!");
@@ -210,64 +295,14 @@
             currentMediaSource = urlInput;
             currentMediaType = getYouTubeId(urlInput) ? 'youtube' : 'direct';
 
-            // Show theater screen immediately
+            currentRoomId = 'WR-' + Math.floor(100000 + Math.random() * 900000);
+            document.getElementById('displayKey').innerText = currentRoomId;
+
             showTheaterScreen(true);
-            updateMemberBadge(1);
             setupPlayer(currentMediaSource);
 
-            // Connect to Peer in background
-            updateConnStatus("Connecting...", "connecting");
-            peer = new Peer();
-
-            peer.on('open', (id) => {
-                currentRoomId = id;
-                document.getElementById('displayKey').innerText = id;
-                updateConnStatus("Ready", "connected");
-                copyFullLink(); // Auto-copy invite link
-            });
-
-            peer.on('error', (err) => {
-                console.warn("Peer error:", err);
-                updateConnStatus("Offline", "disconnected");
-            });
-
-            setupHostListeners();
-        }
-
-        function setupHostListeners() {
-            peer.on('connection', (c) => {
-                if(guestConnections.length >= MAX_PEERS) {
-                    c.on('open', () => { c.send({ type: 'ROOM_FULL' }); c.close(); });
-                    return;
-                }
-
-                c.on('open', () => {
-                    guestConnections.push(c);
-                    updateMemberBadge(guestConnections.length + 1);
-
-                    // Send current video & playback time to this guest
-                    c.send({
-                        type: 'INIT_STATE',
-                        mediaType: currentMediaType,
-                        mediaSource: currentMediaSource,
-                        time: getCurrentTime(),
-                        isPlaying: isPlayerPlaying(),
-                        speed: getCurrentSpeed()
-                    });
-
-                    broadcastSystemMessage("A friend joined the room!");
-                });
-
-                c.on('data', (data) => {
-                    handleIncomingSignal(data, c);
-                });
-
-                c.on('close', () => {
-                    guestConnections = guestConnections.filter(g => g !== c);
-                    updateMemberBadge(guestConnections.length + 1);
-                    broadcastSystemMessage("A friend left the room.");
-                });
-            });
+            connectRealtimeNetwork(currentRoomId);
+            shareOrCopyLink();
         }
 
         function handleManualJoin() {
@@ -285,7 +320,7 @@
             joinRoomDirectly(key, vUrl, vType);
         }
 
-        // Guest joins directly from URL link (AUTOMATIC)
+        // Guest joins directly from URL link
         function joinRoomDirectly(targetRoomId, videoUrl, videoType) {
             isHost = false;
             currentRoomId = targetRoomId;
@@ -300,48 +335,17 @@
                 document.getElementById('syncOverlay').classList.remove('hidden');
             }
 
-            updateConnStatus("Connecting...", "connecting");
-            peer = new Peer();
-
-            peer.on('open', () => {
-                hostConnection = peer.connect(targetRoomId, { reliable: true });
-
-                hostConnection.on('open', () => {
-                    updateConnStatus("Synced", "connected");
-                    hostConnection.send({ type: 'REQUEST_SYNC' });
-                });
-
-                hostConnection.on('data', (data) => {
-                    handleIncomingSignal(data, hostConnection);
-                });
-
-                hostConnection.on('close', () => {
-                    alert("Room closed or Host disconnected.");
-                    leaveRoom();
-                });
-            });
-
-            peer.on('error', (err) => {
-                console.warn("Peer error:", err);
-                updateConnStatus("Offline", "disconnected");
-            });
+            connectRealtimeNetwork(targetRoomId);
         }
 
-        function handleIncomingSignal(data, senderConn) {
-            if(data.type === 'ROOM_FULL') {
-                alert("This room is already full (Maximum 6 persons).");
-                leaveRoom();
-                return;
-            }
-
+        function handleIncomingSignal(data) {
             if(data.type === 'CHAT_MSG') {
                 appendChatMessage({ sender: data.sender, text: data.text, time: data.time, isMe: false });
-                if(isHost) forwardToOtherGuests(data, senderConn);
                 return;
             }
 
             if(data.type === 'REQUEST_SYNC' && isHost) {
-                senderConn.send({
+                sendRealtimeSignal({
                     type: 'INIT_STATE',
                     mediaType: currentMediaType,
                     mediaSource: currentMediaSource,
@@ -367,40 +371,17 @@
                 seekToTime(data.time);
                 playVideo();
                 updatePlayPauseButton(true);
-                if(isHost) forwardToOtherGuests(data, senderConn);
             } else if(data.type === 'PAUSE') {
                 seekToTime(data.time);
                 pauseVideo();
                 updatePlayPauseButton(false);
-                if(isHost) forwardToOtherGuests(data, senderConn);
             } else if(data.type === 'SEEK') {
                 seekToTime(data.time);
-                if(isHost) forwardToOtherGuests(data, senderConn);
             } else if(data.type === 'RATE') {
                 setPlaybackRate(data.rate);
-                if(isHost) forwardToOtherGuests(data, senderConn);
             }
 
             setTimeout(() => { isInternalSync = false; }, 600);
-        }
-
-        function forwardToOtherGuests(payload, originConn) {
-            guestConnections.forEach(c => {
-                if(c !== originConn && c.open) {
-                    c.send(payload);
-                }
-            });
-        }
-
-        function broadcastToRoom(payload) {
-            if(isInternalSync) return;
-            if(isHost) {
-                guestConnections.forEach(c => {
-                    if(c.open) c.send(payload);
-                });
-            } else if(hostConnection && hostConnection.open) {
-                hostConnection.send(payload);
-            }
         }
 
         function setupPlayer(url, callback) {
@@ -446,17 +427,17 @@
 
                 nativeVideo.onplay = () => {
                     updatePlayPauseButton(true);
-                    broadcastToRoom({ type: 'PLAY', time: nativeVideo.currentTime, sender: isHost ? 'Host' : 'Guest' });
+                    if(!isInternalSync) sendRealtimeSignal({ type: 'PLAY', time: nativeVideo.currentTime });
                 };
                 nativeVideo.onpause = () => {
                     updatePlayPauseButton(false);
-                    broadcastToRoom({ type: 'PAUSE', time: nativeVideo.currentTime, sender: isHost ? 'Host' : 'Guest' });
+                    if(!isInternalSync) sendRealtimeSignal({ type: 'PAUSE', time: nativeVideo.currentTime });
                 };
                 nativeVideo.onseeked = () => {
-                    broadcastToRoom({ type: 'SEEK', time: nativeVideo.currentTime, sender: isHost ? 'Host' : 'Guest' });
+                    if(!isInternalSync) sendRealtimeSignal({ type: 'SEEK', time: nativeVideo.currentTime });
                 };
                 nativeVideo.onratechange = () => {
-                    broadcastToRoom({ type: 'RATE', rate: nativeVideo.playbackRate, sender: isHost ? 'Host' : 'Guest' });
+                    if(!isInternalSync) sendRealtimeSignal({ type: 'RATE', rate: nativeVideo.playbackRate });
                 };
 
                 if(callback) callback();
@@ -468,10 +449,10 @@
             const time = ytPlayer.getCurrentTime();
             if(e.data === YT.PlayerState.PLAYING) {
                 updatePlayPauseButton(true);
-                broadcastToRoom({ type: 'PLAY', time: time, sender: isHost ? 'Host' : 'Guest' });
+                sendRealtimeSignal({ type: 'PLAY', time: time });
             } else if(e.data === YT.PlayerState.PAUSED) {
                 updatePlayPauseButton(false);
-                broadcastToRoom({ type: 'PAUSE', time: time, sender: isHost ? 'Host' : 'Guest' });
+                sendRealtimeSignal({ type: 'PAUSE', time: time });
             }
         }
 
@@ -479,7 +460,7 @@
             if(isInternalSync) return;
             const curTime = getCurrentTime();
             if(Math.abs(curTime - lastReportedTime) > 1.8 && isPlayerPlaying()) {
-                broadcastToRoom({ type: 'SEEK', time: curTime, sender: isHost ? 'Host' : 'Guest' });
+                sendRealtimeSignal({ type: 'SEEK', time: curTime });
             }
             lastReportedTime = curTime;
         }, 500);
@@ -489,23 +470,23 @@
             const time = getCurrentTime();
             if(playing) {
                 pauseVideo();
-                broadcastToRoom({ type: 'PAUSE', time, sender: isHost ? 'Host' : 'Guest' });
+                sendRealtimeSignal({ type: 'PAUSE', time: time });
             } else {
                 playVideo();
-                broadcastToRoom({ type: 'PLAY', time, sender: isHost ? 'Host' : 'Guest' });
+                sendRealtimeSignal({ type: 'PLAY', time: time });
             }
         }
 
         function userSeekDelta(delta) {
             const newTime = Math.max(0, getCurrentTime() + delta);
             seekToTime(newTime);
-            broadcastToRoom({ type: 'SEEK', time: newTime, sender: isHost ? 'Host' : 'Guest' });
+            sendRealtimeSignal({ type: 'SEEK', time: newTime });
         }
 
         function userChangeSpeed(val) {
             const rate = parseFloat(val);
             setPlaybackRate(rate);
-            broadcastToRoom({ type: 'RATE', rate, sender: isHost ? 'Host' : 'Guest' });
+            sendRealtimeSignal({ type: 'RATE', rate: rate });
         }
 
         function updatePlayPauseButton(isPlaying) {
@@ -568,9 +549,7 @@
         function unlockPlayback() {
             document.getElementById('syncOverlay').classList.add('hidden');
             playVideo();
-            if(hostConnection && hostConnection.open) {
-                hostConnection.send({ type: 'REQUEST_SYNC' });
-            }
+            sendRealtimeSignal({ type: 'REQUEST_SYNC' });
         }
 
         // Live Chat
@@ -581,10 +560,10 @@
             if(!text) return;
 
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const senderRole = isHost ? 'Host' : 'Guest';
-            appendChatMessage({ sender: senderRole, text, time: timeStr, isMe: true });
+            const senderRole = isHost ? 'Host' : 'Friend';
+            appendChatMessage({ sender: senderRole, text: text, time: timeStr, isMe: true });
 
-            broadcastToRoom({ type: 'CHAT_MSG', sender: senderRole, text, time: timeStr });
+            sendRealtimeSignal({ type: 'CHAT_MSG', sender: senderRole, text: text, time: timeStr });
             input.value = '';
         }
 
@@ -609,15 +588,6 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function broadcastSystemMessage(text) {
-            const container = document.getElementById('chatMessages');
-            const msg = document.createElement('div');
-            msg.className = "text-center text-[10px] text-slate-400 font-semibold my-1";
-            msg.innerText = `⚡ ${text}`;
-            container.appendChild(msg);
-            container.scrollTop = container.scrollHeight;
-        }
-
         function showTheaterScreen(isHostRole) {
             document.getElementById('setupScreen').classList.add('hidden');
             document.getElementById('theaterScreen').classList.remove('hidden');
@@ -630,16 +600,22 @@
                 : "text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30";
         }
 
-        function updateMemberBadge(count) {
-            document.getElementById('memberCountText').innerText = `👥 ${count}/6 in Room`;
-        }
-
-        function copyFullLink() {
+        // Native Mobile Share (Direct WhatsApp) + Fallback to Copy
+        function shareOrCopyLink() {
             if(currentRoomId && currentMediaSource) {
                 const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}&v=${encodeURIComponent(currentMediaSource)}&type=${currentMediaType}`;
-                navigator.clipboard.writeText(url).then(() => {
-                    alert("Room link copied! Share with up to 5 friends.");
-                });
+                
+                if (navigator.share) {
+                    navigator.share({
+                        title: 'Join my WatchRoom',
+                        text: 'Watch this video with me in sync!',
+                        url: url
+                    }).catch(() => {});
+                } else {
+                    navigator.clipboard.writeText(url).then(() => {
+                        alert("Watch Room link copied! Share with friends on WhatsApp.");
+                    });
+                }
             }
         }
 
