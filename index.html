@@ -39,7 +39,6 @@
             transition: opacity 0.2s ease-in-out;
         }
 
-        /* Video Filter Presets */
         .filter-night { filter: sepia(0.35) saturate(1.2) hue-rotate(-15deg) brightness(0.9); }
         .filter-bright { filter: brightness(1.3) contrast(1.15); }
         .filter-vintage { filter: grayscale(0.8) contrast(1.3) brightness(0.95); }
@@ -93,16 +92,20 @@
             </div>
 
             <!-- TAB 1: IN-APP YOUTUBE SEARCH -->
-            <div id="inAppSearchContainer" class="space-y-3">
+            <div id="inAppSearchContainer" class="space-y-3 relative">
                 <div class="flex gap-2">
-                    <input type="text" id="inAppSearchInput" onkeyup="if(event.key==='Enter') executeInAppSearch()" placeholder="Search movie, drama, song..." 
+                    <input type="text" id="inAppSearchInput" oninput="handleSearchTyping(this.value)" onkeyup="if(event.key==='Enter') executeInAppSearch()" placeholder="Search movie, drama, song..." 
                            class="flex-1 p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
                     <button onclick="executeInAppSearch()" class="px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-rose-600/30 cursor-pointer">
                         <i class="fa-solid fa-search"></i>
                     </button>
                 </div>
+
+                <!-- Google Live Autocomplete Suggestions Box -->
+                <div id="suggestionsBox" class="hidden absolute top-12 left-0 right-14 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden text-xs"></div>
+
                 <!-- Search Results List -->
-                <div id="searchResultsList" class="max-h-56 overflow-y-auto space-y-2 pr-1">
+                <div id="searchResultsList" class="max-h-60 overflow-y-auto space-y-2 pr-1">
                     <div class="text-center text-xs text-slate-500 py-6">
                         🔍 Search anything above to launch a room with 1 tap!
                     </div>
@@ -184,15 +187,12 @@
 
                     <!-- Floating Overlay Controls (PiP, Laser Tool, Fullscreen) -->
                     <div id="inVideoOverlayControls" class="absolute top-3 right-3 z-30 flex items-center gap-1.5 transition-opacity duration-300">
-                        <!-- Laser Pointer Toggle -->
                         <button id="laserToggleBtn" onclick="toggleLaserTool()" title="Laser Pointer" class="bg-black/60 hover:bg-black/90 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-white/10 backdrop-blur cursor-pointer">
                             <i class="fa-solid fa-pen-nib text-xs"></i>
                         </button>
-                        <!-- PiP -->
                         <button onclick="togglePiP()" title="Picture-in-Picture" class="bg-black/60 hover:bg-black/90 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-white/10 backdrop-blur cursor-pointer">
                             <i class="fa-solid fa-clone text-xs"></i>
                         </button>
-                        <!-- Smart Landscape Fullscreen -->
                         <button onclick="toggleSmartFullscreen()" title="Smart Fullscreen" class="bg-black/60 hover:bg-black/90 text-white w-8 h-8 rounded-lg flex items-center justify-center transition border border-white/10 backdrop-blur cursor-pointer">
                             <i id="fullscreenIcon" class="fa-solid fa-expand text-xs"></i>
                         </button>
@@ -205,7 +205,6 @@
                         </div>
                         <p class="text-xs text-slate-400">Play Tic-Tac-Toe with friends while waiting!</p>
                         
-                        <!-- 3x3 Grid Game -->
                         <div id="tttBoard" class="grid grid-cols-3 gap-2 w-48 h-48 mx-auto my-2">
                             <button onclick="playTicTacToeMove(0)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
                             <button onclick="playTicTacToeMove(1)" class="ttt-cell bg-slate-800 hover:bg-slate-700 text-white font-bold text-xl rounded-xl flex items-center justify-center"></button>
@@ -219,7 +218,7 @@
                         </div>
                         <div id="tttStatus" class="text-xs font-semibold text-rose-400">Next turn: X</div>
                         
-                        <button id="endIntermissionBtn" onclick="toggleIntermissionBreak()" class="hidden mt-2 px-5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition">
+                        <button id="endIntermissionBtn" onclick="toggleIntermissionBreak()" class="hidden mt-2 px-5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition cursor-pointer">
                             Resume Movie
                         </button>
                     </div>
@@ -304,39 +303,38 @@
 
     </main>
 
-    <!-- TOOLS HUB MODAL (Search & Change, Queue, Polls, Subs, Filters, 300% Boost, Rain Sound) -->
+    <!-- TOOLS HUB MODAL -->
     <div id="featuresModal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-3">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
                     <i class="fa-solid fa-toolbox text-rose-500"></i> Cinema Features Hub
                 </h3>
-                <button onclick="closeFeaturesModal()" class="text-slate-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeFeaturesModal()" class="text-slate-400 hover:text-white text-sm cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
-            <!-- Tab Switcher -->
             <div class="flex border-b border-slate-800 text-[11px] font-bold overflow-x-auto">
-                <button onclick="switchToolsTab('search')" id="toolTabSearch" class="flex-1 pb-2 text-rose-500 border-b-2 border-rose-500 whitespace-nowrap px-2">Search Video</button>
-                <button onclick="switchToolsTab('playlist')" id="toolTabPlaylist" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2">Queue</button>
-                <button onclick="switchToolsTab('poll')" id="toolTabPoll" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2">Poll</button>
-                <button onclick="switchToolsTab('audio')" id="toolTabAudio" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2">Audio & Ambient</button>
-                <button onclick="switchToolsTab('filters')" id="toolTabFilters" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2">Filters</button>
+                <button onclick="switchToolsTab('search')" id="toolTabSearch" class="flex-1 pb-2 text-rose-500 border-b-2 border-rose-500 whitespace-nowrap px-2 cursor-pointer">Search Video</button>
+                <button onclick="switchToolsTab('playlist')" id="toolTabPlaylist" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2 cursor-pointer">Queue</button>
+                <button onclick="switchToolsTab('poll')" id="toolTabPoll" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2 cursor-pointer">Poll</button>
+                <button onclick="switchToolsTab('audio')" id="toolTabAudio" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2 cursor-pointer">Audio & Ambient</button>
+                <button onclick="switchToolsTab('filters')" id="toolTabFilters" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2 cursor-pointer">Filters</button>
             </div>
 
-            <!-- 1. Search Video Inside Room -->
+            <!-- Search Inside Room -->
             <div id="toolSecSearch" class="space-y-3">
                 <div class="flex gap-2">
                     <input type="text" id="insideSearchInput" placeholder="Search new YouTube video..." class="flex-1 p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                    <button onclick="executeInsideSearch()" class="px-3.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg text-white">Search</button>
+                    <button onclick="executeInsideSearch()" class="px-3.5 bg-rose-600 hover:bg-rose-700 text-xs font-bold rounded-lg text-white cursor-pointer">Search</button>
                 </div>
                 <div id="insideSearchResults" class="max-h-48 overflow-y-auto space-y-2 pr-1"></div>
             </div>
 
-            <!-- 2. Playlist / Queue Section -->
+            <!-- Queue -->
             <div id="toolSecPlaylist" class="space-y-3 hidden">
                 <div class="flex gap-2">
                     <input type="text" id="queueVideoInput" placeholder="Add next video URL..." class="flex-1 p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                    <button onclick="addToPlaylistQueue()" class="px-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-xs font-bold text-white">Add</button>
+                    <button onclick="addToPlaylistQueue()" class="px-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-xs font-bold text-white cursor-pointer">Add</button>
                 </div>
                 <div class="text-[11px] font-bold text-slate-400">Up Next:</div>
                 <div id="queueList" class="max-h-36 overflow-y-auto space-y-1.5 text-xs">
@@ -344,15 +342,15 @@
                 </div>
             </div>
 
-            <!-- 3. Poll Section -->
+            <!-- Poll -->
             <div id="toolSecPoll" class="space-y-3 hidden">
                 <input type="text" id="pollQuestionInput" placeholder="Question: e.g. Horror or Comedy next?" class="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
                 <input type="text" id="pollOpt1Input" placeholder="Option A: e.g. Horror" class="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
                 <input type="text" id="pollOpt2Input" placeholder="Option B: e.g. Comedy" class="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                <button onclick="startRoomPoll()" class="w-full py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-xs font-bold text-white transition">Launch Live Poll</button>
+                <button onclick="startRoomPoll()" class="w-full py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-xs font-bold text-white transition cursor-pointer">Launch Live Poll</button>
             </div>
 
-            <!-- 4. Audio Boost & Ambient Cinema Sounds -->
+            <!-- Audio Boost & Ambient -->
             <div id="toolSecAudio" class="space-y-4 hidden">
                 <div class="p-3 bg-slate-800/80 rounded-xl space-y-2">
                     <div class="flex justify-between text-xs font-bold">
@@ -364,21 +362,21 @@
                 <div class="p-3 bg-slate-800/80 rounded-xl space-y-2">
                     <span class="text-xs font-bold">Ambient Background Sound:</span>
                     <div class="flex gap-2">
-                        <button onclick="toggleAmbientSound('rain')" id="ambRainBtn" class="flex-1 py-1.5 bg-slate-700 rounded-lg text-xs font-semibold">🌧️ Rain</button>
-                        <button onclick="toggleAmbientSound('fire')" id="ambFireBtn" class="flex-1 py-1.5 bg-slate-700 rounded-lg text-xs font-semibold">🔥 Fireplace</button>
-                        <button onclick="toggleAmbientSound('off')" class="px-3 py-1.5 bg-slate-700 rounded-lg text-xs font-semibold">Off</button>
+                        <button onclick="toggleAmbientSound('rain')" id="ambRainBtn" class="flex-1 py-1.5 bg-slate-700 rounded-lg text-xs font-semibold cursor-pointer">🌧️ Rain</button>
+                        <button onclick="toggleAmbientSound('fire')" id="ambFireBtn" class="flex-1 py-1.5 bg-slate-700 rounded-lg text-xs font-semibold cursor-pointer">🔥 Fireplace</button>
+                        <button onclick="toggleAmbientSound('off')" class="px-3 py-1.5 bg-slate-700 rounded-lg text-xs font-semibold cursor-pointer">Off</button>
                     </div>
                 </div>
             </div>
 
-            <!-- 5. Video Filters -->
+            <!-- Video Filters -->
             <div id="toolSecFilters" class="space-y-3 hidden">
                 <span class="text-xs text-slate-400">Select display filter:</span>
                 <div class="grid grid-cols-2 gap-2">
-                    <button onclick="applyVideoFilter('none')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold">Normal</button>
-                    <button onclick="applyVideoFilter('night')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold">🌙 Night Shield</button>
-                    <button onclick="applyVideoFilter('bright')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold">☀️ Brightness Boost</button>
-                    <button onclick="applyVideoFilter('vintage')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold">🎞️ Retro Vintage</button>
+                    <button onclick="applyVideoFilter('none')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold cursor-pointer">Normal</button>
+                    <button onclick="applyVideoFilter('night')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold cursor-pointer">🌙 Night Shield</button>
+                    <button onclick="applyVideoFilter('bright')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold cursor-pointer">☀️ Brightness Boost</button>
+                    <button onclick="applyVideoFilter('vintage')" class="p-2 bg-slate-800 rounded-lg text-xs font-semibold cursor-pointer">🎞️ Retro Vintage</button>
                 </div>
             </div>
         </div>
@@ -388,15 +386,15 @@
     <div id="activePollModal" class="hidden fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-80 bg-slate-900 border-2 border-rose-500 rounded-2xl p-4 shadow-2xl z-50 space-y-3">
         <div class="flex justify-between items-start">
             <h4 id="activePollTitle" class="text-xs font-bold text-white">Live Poll</h4>
-            <button onclick="closeActivePollUI()" class="text-slate-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>
+            <button onclick="closeActivePollUI()" class="text-slate-400 hover:text-white text-xs cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="space-y-2">
-            <button onclick="castPollVote(1)" class="w-full p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-left text-xs font-semibold flex justify-between relative overflow-hidden">
+            <button onclick="castPollVote(1)" class="w-full p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-left text-xs font-semibold flex justify-between relative overflow-hidden cursor-pointer">
                 <div id="pollOpt1Bar" class="absolute inset-y-0 left-0 bg-rose-600/30 transition-all duration-300 w-0"></div>
                 <span id="pollOpt1Text" class="relative z-10">Option A</span>
                 <span id="pollOpt1Pct" class="relative z-10 font-mono">0%</span>
             </button>
-            <button onclick="castPollVote(2)" class="w-full p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-left text-xs font-semibold flex justify-between relative overflow-hidden">
+            <button onclick="castPollVote(2)" class="w-full p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-left text-xs font-semibold flex justify-between relative overflow-hidden cursor-pointer">
                 <div id="pollOpt2Bar" class="absolute inset-y-0 left-0 bg-rose-600/30 transition-all duration-300 w-0"></div>
                 <span id="pollOpt2Text" class="relative z-10">Option B</span>
                 <span id="pollOpt2Pct" class="relative z-10 font-mono">0%</span>
@@ -425,16 +423,11 @@
         let videoQueue = [];
         let parsedSubtitles = [];
 
-        // Laser Tool
         let isLaserActive = false;
-        const laserPoints = [];
-
-        // Tic Tac Toe
         let tttState = ["","","","","","","","",""];
         let tttTurn = "X";
         let isIntermissionActive = false;
 
-        // Ambient Audio & Volume Boost
         let audioContext = null;
         let ambientOscillator = null;
 
@@ -545,7 +538,7 @@
         }
 
         /*************************************************************
-         * 2. IN-APP YOUTUBE SEARCH & INSTANT ROOM LAUNCHER
+         * 2. FAST IN-APP YOUTUBE SEARCH & AUTOCOMPLETE (CORS FIXED)
          *************************************************************/
         function switchSearchTab(tab) {
             const searchContainer = document.getElementById('inAppSearchContainer');
@@ -566,32 +559,77 @@
             }
         }
 
-        // Fast Invidious / Piped API for free YouTube search without API keys
+        // Live Google YouTube Autocomplete Suggestions via JSONP (No CORS Issues)
+        let suggestTimeout = null;
+        function handleSearchTyping(val) {
+            clearTimeout(suggestTimeout);
+            const box = document.getElementById('suggestionsBox');
+            if(!val.trim()) { box.classList.add('hidden'); return; }
+
+            suggestTimeout = setTimeout(() => {
+                const script = document.createElement('script');
+                script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(val)}&callback=renderSearchSuggestions`;
+                document.body.appendChild(script);
+                script.onload = () => script.remove();
+            }, 250);
+        }
+
+        window.renderSearchSuggestions = function(data) {
+            const box = document.getElementById('suggestionsBox');
+            if(!data || !data[1] || data[1].length === 0) { box.classList.add('hidden'); return; }
+
+            box.innerHTML = '';
+            data[1].slice(0, 5).forEach(item => {
+                const row = document.createElement('div');
+                row.className = "p-2 hover:bg-slate-700 cursor-pointer text-slate-200 border-b border-slate-700/50 flex items-center gap-2";
+                row.innerHTML = `<i class="fa-solid fa-magnifying-glass text-slate-400 text-[10px]"></i> <span>${item[0]}</span>`;
+                row.onclick = () => {
+                    document.getElementById('inAppSearchInput').value = item[0];
+                    box.classList.add('hidden');
+                    executeInAppSearch();
+                };
+                box.appendChild(row);
+            });
+            box.classList.remove('hidden');
+        };
+
+        // Piped Open CORS API Mirrors
         async function fetchYouTubeVideos(query) {
             const endpoints = [
-                `https://inv.nadeko.net/api/v1/search?q=${encodeURIComponent(query)}&type=video`,
-                `https://invidious.nerdvpn.de/api/v1/search?q=${encodeURIComponent(query)}&type=video`,
-                `https://invidious.f5.si/api/v1/search?q=${encodeURIComponent(query)}&type=video`
+                `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=videos`,
+                `https://pipedapi.adminforge.de/search?q=${encodeURIComponent(query)}&filter=videos`,
+                `https://api.piped.yt/search?q=${encodeURIComponent(query)}&filter=videos`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent('https://pipedapi.kavin.rocks/search?q=' + query + '&filter=videos')}`
             ];
 
             for (let url of endpoints) {
                 try {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 3500);
+                    const timeoutId = setTimeout(() => controller.abort(), 4000);
                     const res = await fetch(url, { signal: controller.signal });
                     clearTimeout(timeoutId);
+
                     if (res.ok) {
                         const data = await res.json();
-                        if (Array.isArray(data) && data.length > 0) return data;
+                        const items = data.items || data;
+                        if (Array.isArray(items) && items.length > 0) {
+                            return items.filter(i => i.type === 'stream' || (i.url && i.url.includes('/watch?v='))).map(i => ({
+                                title: i.title,
+                                author: i.uploaderName || i.uploader || "YouTube",
+                                videoId: i.url.replace('/watch?v=', '').split('&')[0],
+                                thumbnail: i.thumbnail || `https://i.ytimg.com/vi/${i.url.replace('/watch?v=', '').split('&')[0]}/hqdefault.jpg`
+                            }));
+                        }
                     }
                 } catch(e) {
-                    console.warn("Search instance failed, trying next...");
+                    console.warn("API mirror skipped, trying next...");
                 }
             }
             return null;
         }
 
         async function executeInAppSearch() {
+            document.getElementById('suggestionsBox').classList.add('hidden');
             const input = document.getElementById('inAppSearchInput');
             const query = input.value.trim();
             const list = document.getElementById('searchResultsList');
@@ -601,10 +639,11 @@
 
             const results = await fetchYouTubeVideos(query);
 
-            if(!results) {
+            if(!results || results.length === 0) {
                 list.innerHTML = `
-                    <div class="p-3 text-center text-xs text-amber-400 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                        Search servers busy. You can paste the direct link in "Direct Link" tab!
+                    <div class="p-4 text-center text-xs text-amber-400 bg-amber-500/10 rounded-xl border border-amber-500/20 space-y-1">
+                        <div>Search took too long or timed out.</div>
+                        <div class="text-slate-400 text-[11px]">You can paste the direct video link in the "Direct Link" tab!</div>
                     </div>
                 `;
                 return;
@@ -612,20 +651,15 @@
 
             list.innerHTML = '';
             results.slice(0, 8).forEach(v => {
-                const title = v.title || "Video";
-                const author = v.author || "YouTube Channel";
-                const videoId = v.videoId;
-                const thumb = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-
                 const item = document.createElement('div');
                 item.className = "p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 flex items-center gap-2.5 cursor-pointer transition active:scale-98";
-                item.onclick = () => launchRoomWithVideoId(videoId);
+                item.onclick = () => launchRoomWithVideoId(v.videoId);
 
                 item.innerHTML = `
-                    <img src="${thumb}" class="w-20 aspect-video rounded-lg object-cover bg-black shrink-0">
+                    <img src="${v.thumbnail}" class="w-20 aspect-video rounded-lg object-cover bg-black shrink-0">
                     <div class="flex-1 min-w-0">
-                        <div class="text-xs font-bold text-white line-clamp-1">${title}</div>
-                        <div class="text-[10px] text-slate-400 mt-0.5 truncate">${author}</div>
+                        <div class="text-xs font-bold text-white line-clamp-1">${v.title}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5 truncate">${v.author}</div>
                     </div>
                     <button class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shrink-0">
                         <i class="fa-solid fa-play"></i>
@@ -645,7 +679,7 @@
             handleCreateWatchRoom();
         }
 
-        // Search Inside Room (Tools modal)
+        // Inside Room Search
         async function executeInsideSearch() {
             const q = document.getElementById('insideSearchInput').value.trim();
             const list = document.getElementById('insideSearchResults');
@@ -665,7 +699,7 @@
                 el.className = "p-2 bg-slate-800 rounded-lg flex items-center justify-between gap-2 text-xs";
                 el.innerHTML = `
                     <span class="truncate flex-1 font-semibold">${v.title}</span>
-                    <button onclick="switchVideoDirectly('${v.videoId}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold rounded">Play</button>
+                    <button onclick="switchVideoDirectly('${v.videoId}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold rounded cursor-pointer">Play</button>
                 `;
                 list.appendChild(el);
             });
@@ -802,11 +836,6 @@
                 return;
             }
 
-            if(data.type === 'SET_SUBS') {
-                parsedSubtitles = data.subs || [];
-                return;
-            }
-
             if(data.type === 'HOST_LOCK_UPDATE') {
                 isHostOnlyControl = data.isLocked;
                 applyHostLockUI(data.isLocked);
@@ -902,7 +931,7 @@
         });
 
         function handleScreenTap(event) {
-            if(isLaserActive) return; // In laser mode, clicking draws rather than toggles
+            if(isLaserActive) return;
             if (event.target.tagName === 'BUTTON' || event.target.closest('button')) return;
 
             areControlsHidden = !areControlsHidden;
@@ -978,7 +1007,7 @@
         }
 
         /*************************************************************
-         * 7. INTERMISSION BREAK & TIC-TAC-TOE GAME
+         * 7. INTERMISSION BREAK & TIC-TAC-TOE
          *************************************************************/
         function toggleIntermissionBreak() {
             if(!isHost) return;
@@ -986,11 +1015,8 @@
             applyIntermissionOverlay(isIntermissionActive);
             sendRealtimeSignal({ type: 'INTERMISSION_STATE', active: isIntermissionActive });
 
-            if(isIntermissionActive) {
-                pauseVideo();
-            } else {
-                playVideo();
-            }
+            if(isIntermissionActive) pauseVideo();
+            else playVideo();
         }
 
         function applyIntermissionOverlay(active) {
@@ -1022,16 +1048,14 @@
         }
 
         /*************************************************************
-         * 8. 300% VOLUME BOOSTER, AMBIENT SOUNDS & RESUME MEMORY
+         * 8. 300% VOLUME BOOSTER, AMBIENT SOUNDS & RESUME
          *************************************************************/
         function changeVolumeBoost(val) {
             document.getElementById('volBoostDisplay').innerText = val + '%';
-            // Scale gain for HTML5 audio
             const video = document.getElementById('nativePlayer');
             if(video) video.volume = 1;
         }
 
-        // Web Audio synthesized ambient sounds (No external files!)
         function toggleAmbientSound(type) {
             if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -1081,6 +1105,9 @@
         /*************************************************************
          * 9. VOICE NOTES & CHAT
          *************************************************************/
+        let mediaRecorder = null;
+        let audioChunks = [];
+
         async function startVoiceRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1139,7 +1166,7 @@
             bubble.className = isMe 
                 ? 'bg-rose-600 text-white rounded-2xl rounded-tr-none px-3.5 py-2 text-xs flex items-center gap-2 shadow-md' 
                 : 'bg-slate-800 text-slate-100 border border-slate-700 rounded-2xl rounded-tl-none px-3.5 py-2 text-xs flex items-center gap-2 shadow-md';
-            bubble.innerHTML = `<i class="fa-solid fa-volume-high animate-bounce"></i> <span>Voice Note (Played Live)</span>`;
+            bubble.innerHTML = `<i class="fa-solid fa-volume-high animate-bounce"></i> <span>Voice Note</span>`;
 
             const meta = document.createElement('div');
             meta.className = `text-[9px] mt-1 px-1 font-semibold ${color || 'text-slate-400'}`;
@@ -1172,7 +1199,7 @@
         }
 
         /*************************************************************
-         * 10. POLLS & SUBTITLES (.SRT)
+         * 10. POLLS & PLAYLIST QUEUE
          *************************************************************/
         function openFeaturesModal() {
             document.getElementById('featuresModal').classList.remove('hidden');
@@ -1186,13 +1213,13 @@
                 const sec = document.getElementById('toolSec' + t);
                 const tabBtn = document.getElementById('toolTab' + t);
                 sec.classList.add('hidden');
-                tabBtn.className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2";
+                tabBtn.className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent whitespace-nowrap px-2 cursor-pointer";
             });
 
             const activeSec = document.getElementById('toolSec' + tab.charAt(0).toUpperCase() + tab.slice(1));
             const activeTabBtn = document.getElementById('toolTab' + tab.charAt(0).toUpperCase() + tab.slice(1));
             activeSec.classList.remove('hidden');
-            activeTabBtn.className = "flex-1 pb-2 text-rose-500 border-b-2 border-rose-500 whitespace-nowrap px-2";
+            activeTabBtn.className = "flex-1 pb-2 text-rose-500 border-b-2 border-rose-500 whitespace-nowrap px-2 cursor-pointer";
         }
 
         function addToPlaylistQueue() {
@@ -1218,7 +1245,7 @@
                 el.className = "p-2 bg-slate-800 rounded flex justify-between items-center";
                 el.innerHTML = `
                     <span class="truncate flex-1 pr-2">${index + 1}. ${item}</span>
-                    <button onclick="removeFromQueue(${index})" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button>
+                    <button onclick="removeFromQueue(${index})" class="text-rose-400 hover:text-rose-300 cursor-pointer"><i class="fa-solid fa-trash"></i></button>
                 `;
                 list.appendChild(el);
             });
@@ -1242,6 +1269,7 @@
             }
         }
 
+        let activePollData = null;
         function startRoomPoll() {
             const q = document.getElementById('pollQuestionInput').value.trim();
             const opt1 = document.getElementById('pollOpt1Input').value.trim();
@@ -1310,7 +1338,7 @@
         }
 
         /*************************************************************
-         * 11. PLAYER CONTROLS & RESUME TIMESTAMP MEMORY
+         * 11. PLAYER CONTROLS & RESUME MEMORY
          *************************************************************/
         function toggleHostControlLock() {
             if(!isHost) return;
@@ -1358,7 +1386,6 @@
             const nativeVideo = document.getElementById('nativePlayer');
             const ytDiv = document.getElementById('ytPlayer');
 
-            // Check Resume Last Night Memory
             const savedTime = localStorage.getItem('resume_time_' + (ytId || url));
             let startSeconds = 0;
             if(savedTime && parseFloat(savedTime) > 30) {
@@ -1443,20 +1470,12 @@
             }
         }
 
-        // Periodic Seek & Resume Memory Save Loop (every 300ms)
         setInterval(() => {
             const curTime = getCurrentTime();
 
-            // Save Resume Timestamp
             if(currentMediaSource && curTime > 10) {
                 const vidKey = getYouTubeId(currentMediaSource) || currentMediaSource;
                 localStorage.setItem('resume_time_' + vidKey, curTime);
-            }
-
-            // Subtitle Display
-            if(parsedSubtitles.length > 0) {
-                const sub = parsedSubtitles.find(s => curTime >= s.start && curTime <= s.end);
-                document.getElementById('subtitleDisplay').innerHTML = sub ? sub.text : '';
             }
 
             if(isInternalSync) return;
