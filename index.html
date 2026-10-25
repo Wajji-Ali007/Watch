@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WatchTogether - 6-Person Watch Room</title>
+    <title>WatchRoom - Synchronized Movie Room</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -43,35 +43,14 @@
             
             <div class="text-center space-y-1">
                 <h2 class="text-lg font-black text-white">Create a Watch Room</h2>
-                <p class="text-xs text-slate-400">Watch YouTube or Stream Phone Movies with Friends</p>
+                <p class="text-xs text-slate-400">Watch together with up to 6 friends</p>
             </div>
 
-            <!-- Source Switcher -->
-            <div class="space-y-3">
-                <div class="flex border-b border-slate-800">
-                    <button id="tabUrlBtn" onclick="switchMediaTab('url')" class="flex-1 pb-2.5 font-bold text-xs text-rose-500 border-b-2 border-rose-500 transition cursor-pointer">
-                        <i class="fa-solid fa-link mr-1"></i> Web Video Link
-                    </button>
-                    <button id="tabFileBtn" onclick="switchMediaTab('file')" class="flex-1 pb-2.5 font-bold text-xs text-slate-400 border-b-2 border-transparent transition cursor-pointer">
-                        <i class="fa-solid fa-file-video mr-1"></i> Phone File (.mp4)
-                    </button>
-                </div>
-
-                <!-- Web Link Input -->
-                <div id="urlInputContainer" class="space-y-1">
-                    <input type="text" id="videoUrlInput" placeholder="Paste YouTube or direct video URL here..." 
-                           class="w-full p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
-                </div>
-
-                <!-- Phone Storage File Input -->
-                <div id="fileInputContainer" class="hidden space-y-1">
-                    <label class="block p-4 border-2 border-dashed border-slate-700 hover:border-rose-500 rounded-xl text-center cursor-pointer transition bg-slate-800/50">
-                        <i class="fa-solid fa-cloud-arrow-up text-rose-500 text-2xl mb-1"></i>
-                        <div id="selectedFileName" class="text-xs font-semibold text-slate-300">Tap to select movie from phone storage</div>
-                        <div class="text-[10px] text-slate-500 mt-0.5">MP4, WebM, MKV supported</div>
-                        <input type="file" id="localVideoFile" accept="video/*" class="hidden" onchange="handleFileSelect(event)">
-                    </label>
-                </div>
+            <!-- Video Link Input -->
+            <div class="space-y-1">
+                <label class="block text-xs font-semibold text-slate-400 mb-1">YouTube or Video URL (.mp4):</label>
+                <input type="text" id="videoUrlInput" placeholder="https://www.youtube.com/watch?v=..." 
+                       class="w-full p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-rose-500 text-white placeholder-slate-500">
             </div>
 
             <!-- Create Room Button -->
@@ -99,7 +78,7 @@
                     <span id="roleBadge" class="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">Host</span>
                     <div>
                         <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Room Code</div>
-                        <div id="displayKey" class="text-xs font-mono font-bold text-slate-200">Connecting...</div>
+                        <div id="displayKey" class="text-xs font-mono font-bold text-slate-200">Generating...</div>
                     </div>
                 </div>
 
@@ -117,13 +96,6 @@
             <div class="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-slate-800 flex items-center justify-center">
                 <div id="ytPlayer" class="w-full h-full pointer-events-auto"></div>
                 <video id="nativePlayer" class="w-full h-full hidden" playsinline></video>
-
-                <!-- Loading Stream Indicator for Guest -->
-                <div id="streamWaitingIndicator" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center z-20 hidden space-y-3">
-                    <i class="fa-solid fa-spinner fa-spin text-rose-500 text-3xl"></i>
-                    <h3 class="text-sm font-bold text-white">Connecting to Host's Live Movie Stream...</h3>
-                    <p class="text-xs text-slate-400 max-w-xs">Movie is streaming directly from the host's phone.</p>
-                </div>
 
                 <!-- Mobile Autoplay Unlock Overlay -->
                 <div id="syncOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-30 hidden p-4 text-center">
@@ -199,11 +171,8 @@
         let guestConnections = [];
         let hostConnection = null;
 
-        let currentMediaType = 'youtube'; // 'youtube' | 'direct' | 'local'
+        let currentMediaType = 'youtube';
         let currentMediaSource = null;
-        let localSelectedFileName = null;
-        let localFileBlobUrl = null;
-        let localMediaStream = null; // Captured stream from host video
 
         let ytPlayer = null;
         let isInternalSync = false;
@@ -226,152 +195,49 @@
             }
         }
 
-        function switchMediaTab(tab) {
-            const urlContainer = document.getElementById('urlInputContainer');
-            const fileContainer = document.getElementById('fileInputContainer');
-            const urlBtn = document.getElementById('tabUrlBtn');
-            const fileBtn = document.getElementById('tabFileBtn');
-
-            if(tab === 'url') {
-                urlContainer.classList.remove('hidden');
-                fileContainer.classList.add('hidden');
-                urlBtn.className = "flex-1 pb-2.5 font-bold text-xs text-rose-500 border-b-2 border-rose-500 transition cursor-pointer";
-                fileBtn.className = "flex-1 pb-2.5 font-bold text-xs text-slate-400 border-b-2 border-transparent transition cursor-pointer";
-            } else {
-                fileContainer.classList.remove('hidden');
-                urlContainer.classList.add('hidden');
-                fileBtn.className = "flex-1 pb-2.5 font-bold text-xs text-rose-500 border-b-2 border-rose-500 transition cursor-pointer";
-                urlBtn.className = "flex-1 pb-2.5 font-bold text-xs text-slate-400 border-b-2 border-transparent transition cursor-pointer";
-            }
-        }
-
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            if(file) {
-                localSelectedFileName = file.name;
-                document.getElementById('selectedFileName').innerText = `Selected: ${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)`;
-                localFileBlobUrl = URL.createObjectURL(file);
-            }
-        }
-
         function getYouTubeId(url) {
             if(!url) return null;
             const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        function initPeerInstance() {
-            return new Promise((resolve, reject) => {
-                updateConnStatus("Connecting...", "connecting");
-                
-                peer = new Peer({
-                    config: {
-                        iceServers: [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' }
-                        ]
-                    }
-                });
+        // Host creates room (INSTANT, NEVER FREEZES)
+        function handleCreateWatchRoom() {
+            const urlInput = document.getElementById('videoUrlInput').value.trim();
+            if(!urlInput) return alert("Please paste a video URL first!");
 
-                peer.on('open', (id) => {
-                    currentRoomId = id;
-                    document.getElementById('displayKey').innerText = id;
-                    updateConnStatus("Ready", "connected");
-                    resolve(id);
-                });
+            isHost = true;
+            currentMediaSource = urlInput;
+            currentMediaType = getYouTubeId(urlInput) ? 'youtube' : 'direct';
 
-                peer.on('error', (err) => {
-                    console.error("PeerJS Error:", err);
-                    updateConnStatus("Error", "disconnected");
-                    reject(err);
-                });
+            // Show theater screen immediately
+            showTheaterScreen(true);
+            updateMemberBadge(1);
+            setupPlayer(currentMediaSource);
+
+            // Connect to Peer in background
+            updateConnStatus("Connecting...", "connecting");
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                currentRoomId = id;
+                document.getElementById('displayKey').innerText = id;
+                updateConnStatus("Ready", "connected");
+                copyFullLink(); // Auto-copy invite link
             });
-        }
 
-        // Host creates room
-        async function handleCreateWatchRoom() {
-            const isFileMode = !document.getElementById('fileInputContainer').classList.contains('hidden');
+            peer.on('error', (err) => {
+                console.warn("Peer error:", err);
+                updateConnStatus("Offline", "disconnected");
+            });
 
-            if(isFileMode) {
-                if(!localFileBlobUrl) return alert("Please select a video file from your storage!");
-                currentMediaType = 'local';
-                currentMediaSource = localSelectedFileName;
-            } else {
-                const urlInput = document.getElementById('videoUrlInput').value.trim();
-                if(!urlInput) return alert("Please enter a video URL!");
-                currentMediaSource = urlInput;
-                currentMediaType = getYouTubeId(urlInput) ? 'youtube' : 'direct';
-            }
-
-            const btn = document.getElementById('createRoomBtn');
-            btn.disabled = true;
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Creating Room...`;
-
-            try {
-                isHost = true;
-                await initPeerInstance();
-                setupHostListeners();
-
-                if(currentMediaType === 'local') {
-                    setupHostLocalStream(localFileBlobUrl);
-                } else {
-                    setupPlayer(currentMediaSource);
-                }
-
-                showTheaterScreen(true);
-                updateMemberBadge(1);
-                copyFullLink();
-            } catch(e) {
-                console.error(e);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = `<i class="fa-solid fa-play"></i> Create Room & Copy Invite Link`;
-            }
-        }
-
-        // Host sets up local video and captures stream for guests
-        function setupHostLocalStream(blobUrl) {
-            document.getElementById('ytPlayer').classList.add('hidden');
-            const video = document.getElementById('nativePlayer');
-            video.classList.remove('hidden');
-            video.src = blobUrl;
-
-            video.onplay = () => {
-                updatePlayPauseButton(true);
-                broadcastToRoom({ type: 'PLAY', time: video.currentTime, sender: 'Host' });
-
-                // Capture stream and stream to all guests
-                if(!localMediaStream && (video.captureStream || video.mozCaptureStream)) {
-                    try {
-                        localMediaStream = video.captureStream ? video.captureStream(25) : video.mozCaptureStream(25);
-                        guestConnections.forEach(c => {
-                            peer.call(c.peer, localMediaStream);
-                        });
-                    } catch(err) {
-                        console.error("Capture stream error:", err);
-                    }
-                }
-            };
-
-            video.onpause = () => {
-                updatePlayPauseButton(false);
-                broadcastToRoom({ type: 'PAUSE', time: video.currentTime, sender: 'Host' });
-            };
-            video.onseeked = () => {
-                broadcastToRoom({ type: 'SEEK', time: video.currentTime, sender: 'Host' });
-            };
-            video.onratechange = () => {
-                broadcastToRoom({ type: 'RATE', rate: video.playbackRate, sender: 'Host' });
-            };
+            setupHostListeners();
         }
 
         function setupHostListeners() {
             peer.on('connection', (c) => {
                 if(guestConnections.length >= MAX_PEERS) {
-                    c.on('open', () => {
-                        c.send({ type: 'ROOM_FULL' });
-                        c.close();
-                    });
+                    c.on('open', () => { c.send({ type: 'ROOM_FULL' }); c.close(); });
                     return;
                 }
 
@@ -379,6 +245,7 @@
                     guestConnections.push(c);
                     updateMemberBadge(guestConnections.length + 1);
 
+                    // Send current video & playback time to this guest
                     c.send({
                         type: 'INIT_STATE',
                         mediaType: currentMediaType,
@@ -387,11 +254,6 @@
                         isPlaying: isPlayerPlaying(),
                         speed: getCurrentSpeed()
                     });
-
-                    // If local stream is playing, call guest with stream!
-                    if(currentMediaType === 'local' && localMediaStream) {
-                        peer.call(c.peer, localMediaStream);
-                    }
 
                     broadcastSystemMessage("A friend joined the room!");
                 });
@@ -423,58 +285,45 @@
             joinRoomDirectly(key, vUrl, vType);
         }
 
-        // Guest joins directly from URL link (DIRECT LIVE STREAM, NO FILE SELECTION)
-        async function joinRoomDirectly(targetRoomId, videoUrl, videoType) {
+        // Guest joins directly from URL link (AUTOMATIC)
+        function joinRoomDirectly(targetRoomId, videoUrl, videoType) {
             isHost = false;
             currentRoomId = targetRoomId;
             document.getElementById('displayKey').innerText = targetRoomId;
 
             showTheaterScreen(false);
 
-            if(videoType === 'local') {
-                currentMediaType = 'local';
-                document.getElementById('ytPlayer').classList.add('hidden');
-                document.getElementById('nativePlayer').classList.remove('hidden');
-                // Show stream loading indicator until video stream arrives
-                document.getElementById('streamWaitingIndicator').classList.remove('hidden');
-            } else if(videoUrl) {
+            if(videoUrl) {
                 currentMediaSource = decodeURIComponent(videoUrl);
                 currentMediaType = videoType || (getYouTubeId(currentMediaSource) ? 'youtube' : 'direct');
                 setupPlayer(currentMediaSource);
                 document.getElementById('syncOverlay').classList.remove('hidden');
             }
 
-            await initPeerInstance();
+            updateConnStatus("Connecting...", "connecting");
+            peer = new Peer();
 
-            // Listen for incoming live stream from host
-            peer.on('call', (call) => {
-                call.answer(); // Answer without sending stream
-                call.on('stream', (remoteStream) => {
-                    document.getElementById('streamWaitingIndicator').classList.add('hidden');
-                    const video = document.getElementById('nativePlayer');
-                    document.getElementById('ytPlayer').classList.add('hidden');
-                    video.classList.remove('hidden');
-                    video.srcObject = remoteStream;
-                    video.play().catch(() => {
-                        document.getElementById('syncOverlay').classList.remove('hidden');
-                    });
+            peer.on('open', () => {
+                hostConnection = peer.connect(targetRoomId, { reliable: true });
+
+                hostConnection.on('open', () => {
+                    updateConnStatus("Synced", "connected");
+                    hostConnection.send({ type: 'REQUEST_SYNC' });
+                });
+
+                hostConnection.on('data', (data) => {
+                    handleIncomingSignal(data, hostConnection);
+                });
+
+                hostConnection.on('close', () => {
+                    alert("Room closed or Host disconnected.");
+                    leaveRoom();
                 });
             });
 
-            hostConnection = peer.connect(targetRoomId, { reliable: true });
-
-            hostConnection.on('open', () => {
-                updateConnStatus("Synced", "connected");
-                hostConnection.send({ type: 'REQUEST_SYNC' });
-            });
-
-            hostConnection.on('data', (data) => {
-                handleIncomingSignal(data, hostConnection);
-            });
-
-            hostConnection.on('close', () => {
-                alert("Room closed or Host disconnected.");
-                leaveRoom();
+            peer.on('error', (err) => {
+                console.warn("Peer error:", err);
+                updateConnStatus("Offline", "disconnected");
             });
         }
 
@@ -500,11 +349,6 @@
                     isPlaying: isPlayerPlaying(),
                     speed: getCurrentSpeed()
                 });
-
-                // Call guest if local stream is active
-                if(currentMediaType === 'local' && localMediaStream) {
-                    peer.call(senderConn.peer, localMediaStream);
-                }
                 return;
             }
 
@@ -514,13 +358,11 @@
                 currentMediaType = data.mediaType;
                 currentMediaSource = data.mediaSource;
 
-                if(currentMediaType !== 'local') {
-                    setupPlayer(data.mediaSource, () => {
-                        seekToTime(data.time);
-                        setPlaybackRate(data.speed || 1);
-                        if(data.isPlaying) playVideo(); else pauseVideo();
-                    });
-                }
+                setupPlayer(data.mediaSource, () => {
+                    seekToTime(data.time);
+                    setPlaybackRate(data.speed || 1);
+                    if(data.isPlaying) playVideo(); else pauseVideo();
+                });
             } else if(data.type === 'PLAY') {
                 seekToTime(data.time);
                 playVideo();
@@ -601,6 +443,22 @@
                 ytDiv.classList.add('hidden');
                 nativeVideo.classList.remove('hidden');
                 nativeVideo.src = url;
+
+                nativeVideo.onplay = () => {
+                    updatePlayPauseButton(true);
+                    broadcastToRoom({ type: 'PLAY', time: nativeVideo.currentTime, sender: isHost ? 'Host' : 'Guest' });
+                };
+                nativeVideo.onpause = () => {
+                    updatePlayPauseButton(false);
+                    broadcastToRoom({ type: 'PAUSE', time: nativeVideo.currentTime, sender: isHost ? 'Host' : 'Guest' });
+                };
+                nativeVideo.onseeked = () => {
+                    broadcastToRoom({ type: 'SEEK', time: nativeVideo.currentTime, sender: isHost ? 'Host' : 'Guest' });
+                };
+                nativeVideo.onratechange = () => {
+                    broadcastToRoom({ type: 'RATE', rate: nativeVideo.playbackRate, sender: isHost ? 'Host' : 'Guest' });
+                };
+
                 if(callback) callback();
             }
         }
@@ -777,16 +635,10 @@
         }
 
         function copyFullLink() {
-            if(currentRoomId) {
-                let url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}`;
-                if(currentMediaType !== 'local' && currentMediaSource) {
-                    url += `&v=${encodeURIComponent(currentMediaSource)}&type=${currentMediaType}`;
-                } else if(currentMediaType === 'local') {
-                    url += `&type=local`;
-                }
-
+            if(currentRoomId && currentMediaSource) {
+                const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${currentRoomId}&v=${encodeURIComponent(currentMediaSource)}&type=${currentMediaType}`;
                 navigator.clipboard.writeText(url).then(() => {
-                    alert("Watch Room link copied! Share with friends.");
+                    alert("Room link copied! Share with up to 5 friends.");
                 });
             }
         }
